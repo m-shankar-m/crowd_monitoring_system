@@ -6,11 +6,11 @@ from src.risk.alert import generate_alert
 app = FastAPI(title="Crowd Monitoring API")
 
 @app.post("/live-density")
-async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown"):
+async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown", max_capacity: int = 25):
     try:
         contents = await file.read()
         results = process_image(contents)
-        alert_info = generate_alert(results["count"], zone_name)
+        alert_info = generate_alert(results["count"], zone_name, max_capacity)
         results["risk"] = alert_info
         return results
     except Exception as e:
@@ -40,6 +40,6 @@ def predict_risk(periods: int = 30):
     return get_predictive_risk(periods)
 
 @app.get("/test-email-alert")
-def test_email_alert(count: int = 30, zone_name: str = "Test Zone"):
+def test_email_alert(count: int = 30, zone_name: str = "Test Zone", max_capacity: int = 25):
     # Useful for verifying SMTP setup quickly without video upload.
-    return generate_alert(count, zone_name)
+    return generate_alert(count, zone_name, max_capacity)

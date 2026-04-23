@@ -74,8 +74,8 @@ def _send_high_alert_email(count, message, zone_name="Unknown"):
         "reason": "sent"
     }
 
-def generate_alert(count, zone_name="Unknown"):
-    level = get_risk_level(count)
+def generate_alert(count, zone_name="Unknown", max_capacity=25):
+    level = get_risk_level(count, max_capacity)
     is_alert = level in ["MODERATE", "HIGH ALERT"]
     
     if level == "LOW":
@@ -116,7 +116,7 @@ def generate_alert(count, zone_name="Unknown"):
         "zone": zone_name
     }
 
-def predict_future_risk(forecast_data):
+def predict_future_risk(forecast_data, max_capacity=25):
     peak_pred = 0
     first_high_risk = None
     
@@ -127,7 +127,7 @@ def predict_future_risk(forecast_data):
         if pred > peak_pred:
             peak_pred = pred
             
-        if get_risk_level(pred) == "HIGH ALERT" and first_high_risk is None:
+        if get_risk_level(pred, max_capacity) == "HIGH ALERT" and first_high_risk is None:
             first_high_risk = ts
             
     return {

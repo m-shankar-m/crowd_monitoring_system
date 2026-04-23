@@ -206,9 +206,8 @@ with c2:
     st.markdown("<div class='section-title'><span class='section-badge'>Team 6</span> Alert feed</div>", unsafe_allow_html=True)
     alert_ph = st.empty()
 
-def update_zone_snapshots(counts):
-    # Maximum Mock Capacities
-    caps = [50, 40, 30, 60]
+def update_zone_snapshots(counts, caps):
+    # Maximum Capacities passed from sidebar
     html = "<div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'>"
     names = ["Zone A/1", "Zone B/2", "Zone C/3", "Zone D/4"]
     
@@ -231,10 +230,9 @@ def update_zone_snapshots(counts):
     html += "</div>"
     zone_ph.markdown(html, unsafe_allow_html=True)
 
-def update_alert_feed(counts):
+def update_alert_feed(counts, caps):
     html = ""
     names = ["Zone A/1", "Zone B/2", "Zone C/3", "Zone D/4"]
-    caps = [50, 40, 30, 60]
     
     alerts_triggered = 0
     for i in range(4):
@@ -338,9 +336,17 @@ def render_graphs(histories):
             idx += 1
 
 
+# Sidebar Settings
+st.sidebar.markdown("### ⚙️ Threshold Settings")
+cap_a = st.sidebar.number_input("Zone A/1 Capacity", value=50, min_value=1)
+cap_b = st.sidebar.number_input("Zone B/2 Capacity", value=40, min_value=1)
+cap_c = st.sidebar.number_input("Zone C/3 Capacity", value=30, min_value=1)
+cap_d = st.sidebar.number_input("Zone D/4 Capacity", value=60, min_value=1)
+user_caps = [cap_a, cap_b, cap_c, cap_d]
+
 # Draw initial zero state
-update_zone_snapshots([0, 0, 0, 0])
-update_alert_feed([0, 0, 0, 0])
+update_zone_snapshots([0, 0, 0, 0], user_caps)
+update_alert_feed([0, 0, 0, 0], user_caps)
 
 
 # Application Loop configuration
@@ -413,7 +419,7 @@ if st.session_state.get('running', False) and input_source != "None":
                 is_success, buffer = cv2.imencode(".jpg", frame)
                 
                 if is_success:
-                    res = upload_frame(buffer.tobytes(), zone_name=zones[i])
+                    res = upload_frame(buffer.tobytes(), zone_name=zones[i], max_capacity=user_caps[i])
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     
                     if res:
@@ -451,9 +457,9 @@ if st.session_state.get('running', False) and input_source != "None":
             if frames[i] is not None:
                 st.session_state.histories[i].append(zone_counts[i])
                 
-        alerts = update_alert_feed(zone_counts)
+        alerts = update_alert_feed(zone_counts, user_caps)
         update_kpis(current_total, last_total, alerts)
-        update_zone_snapshots(zone_counts)
+        update_zone_snapshots(zone_counts, user_caps)
         
         if frame_counter % 15 == 0:
             last_total = current_total
