@@ -10,7 +10,13 @@ async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown",
     try:
         contents = await file.read()
         results = process_image(contents)
-        alert_info = generate_alert(results["count"], zone_name, max_capacity)
+        
+        # New: Get predictive context if count is high or rising
+        forecast_info = None
+        if results["count"] > 0.5 * max_capacity:
+            forecast_info = get_predictive_risk(periods=15)
+            
+        alert_info = generate_alert(results["count"], zone_name, max_capacity, forecast_info)
         results["risk"] = alert_info
         return results
     except Exception as e:

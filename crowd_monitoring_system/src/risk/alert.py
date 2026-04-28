@@ -12,7 +12,7 @@ load_dotenv()
 LOG_PATH = "logs/alerts.log"
 _last_high_alert_ts_by_zone = {}
 
-def _send_high_alert_email(count, message, zone_name="Unknown"):
+def _send_high_alert_email(count, message, zone_name="Unknown", forecast_info=None):
     global _last_high_alert_ts_by_zone
 
     email_to = os.getenv("ALERT_EMAIL_TO", "shankarm1612@gmail.com")
@@ -49,6 +49,14 @@ def _send_high_alert_email(count, message, zone_name="Unknown"):
         f"Message: {message}\n"
         f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
     )
+    
+    if forecast_info:
+        body += (
+            f"\n--- FORECAST OUTLOOK ---\n"
+            f"Peak Expected: {forecast_info.get('peak_prediction', 'N/A')} people\n"
+            f"High Risk Persists Until: {forecast_info.get('first_high_risk_time', 'N/A')}\n"
+            f"Recommendation: Immediate staff deployment suggested.\n"
+        )
 
     email = EmailMessage()
     email["From"] = email_from
@@ -74,7 +82,7 @@ def _send_high_alert_email(count, message, zone_name="Unknown"):
         "reason": "sent"
     }
 
-def generate_alert(count, zone_name="Unknown", max_capacity=25):
+def generate_alert(count, zone_name="Unknown", max_capacity=25, forecast_info=None):
     level = get_risk_level(count, max_capacity)
     is_alert = level in ["MODERATE", "HIGH ALERT"]
     
@@ -93,7 +101,7 @@ def generate_alert(count, zone_name="Unknown", max_capacity=25):
     email_status = {"sent": False, "reason": "not_high_alert"}
     if level == "HIGH ALERT":
         try:
-            email_status = _send_high_alert_email(count, message, zone_name)
+            email_status = _send_high_alert_email(count, message, zone_name, forecast_info)
         except Exception as exc:
             reason = str(exc)
             if "BadCredentials" in reason or "535" in reason:

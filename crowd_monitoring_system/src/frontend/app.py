@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
-from src.frontend.api import upload_frame, get_forecast
+from src.frontend.api import upload_frame, get_forecast, train_model
 
 st.set_page_config(page_title="Crowd Predictor Framework", layout="wide", initial_sidebar_state="collapsed")
 
@@ -128,7 +128,7 @@ st.markdown("""
 
 # Main Header
 st.markdown("<h1>Crowd Predictor Framework — Live Dashboard</h1>", unsafe_allow_html=True)
-st.markdown("<div class='sub-head'>6-team integrated view • CrowdLSTM • Real-time risk alerting</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-head'>6-team integrated view • Multi-Variate CrowdLSTM • Predictive Risk Intelligence</div>", unsafe_allow_html=True)
 
 # Top KPIs Placeholders
 st.markdown("<hr style='margin-top: 5px; margin-bottom: 15px;'>", unsafe_allow_html=True)
@@ -384,6 +384,15 @@ elif input_source == "Live Camera":
                     caps[i] = cv2.VideoCapture(cam_id.strip())
             except Exception:
                 pass
+
+st.sidebar.markdown("### 🧠 Model Management")
+if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophet on latest data"):
+    with st.spinner("Training models... this may take 1-2 minutes"):
+        result = train_model()
+        if result and result.get("status") == "success":
+            st.sidebar.success("Models trained successfully!")
+        else:
+            st.sidebar.error(f"Training failed: {result.get('message') if result else 'Server error'}")
 
 col1, col2 = st.sidebar.columns(2)
 if col1.button("Start Processing"):

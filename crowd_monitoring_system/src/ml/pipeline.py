@@ -6,7 +6,8 @@ from .lstm_model import CrowdLSTMModel
 class MLPipeline:
     def __init__(self):
         self.prophet_model = ForecastModel()
-        self.lstm_model = CrowdLSTMModel(sequence_length=10, epochs=10)
+        # Updated to match improved defaults
+        self.lstm_model = CrowdLSTMModel(sequence_length=20, epochs=50)
         self.csv_path = "data/crowd_data.csv"
         
         # Load serialized models dynamically for rapid inference
@@ -28,17 +29,20 @@ class MLPipeline:
                 
             df['ds'] = pd.to_datetime(df['timestamp'])
             df['y'] = df['count'].rolling(window=3, min_periods=1).mean()
+            # New: Add temporal features
+            df['hour'] = df['ds'].dt.hour
+            df['day'] = df['ds'].dt.dayofweek
             
             # Using only the most recent data to train quickly
             df_train = df.tail(5000).copy()
             
             # Train Prophet
-            prophet_success = self.prophet_model.train(df_train[['ds', 'y']])
+            prophet_success = self.prophet_model.train(df_train[['ds', 'y', 'hour', 'day']])
             if prophet_success:
                 self.prophet_model.save()
             
             # Train LSTM
-            lstm_success = self.lstm_model.train(df_train[['ds', 'y']])
+            lstm_success = self.lstm_model.train(df_train[['ds', 'y', 'hour', 'day']])
             if lstm_success:
                 self.lstm_model.save()
             
@@ -67,6 +71,9 @@ class MLPipeline:
             
             df['ds'] = pd.to_datetime(df['timestamp'])
             df['y'] = df['count'].rolling(window=min(3, len(df)), min_periods=1).mean()
+            # New: Add temporal features for inference
+            df['hour'] = df['ds'].dt.hour
+            df['day'] = df['ds'].dt.dayofweek
             
             # Predictions
             prophet_df = self.prophet_model.predict(periods=periods)

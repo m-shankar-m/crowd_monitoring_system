@@ -13,6 +13,11 @@ class ForecastModel:
         if df.empty or len(df) < 3:
             return False
         self.model = Prophet(yearly_seasonality=False, weekly_seasonality=False, daily_seasonality=True)
+        # Add extra regressors for hour and day
+        if 'hour' in df.columns:
+            self.model.add_regressor('hour')
+        if 'day' in df.columns:
+            self.model.add_regressor('day')
         self.model.fit(df)
         return True
         
@@ -43,5 +48,8 @@ class ForecastModel:
         if self.model is None:
             return None
         future = self.model.make_future_dataframe(periods=periods, freq=freq)
+        # Add regressors to future dataframe
+        future['hour'] = future['ds'].dt.hour
+        future['day'] = future['ds'].dt.dayofweek
         forecast = self.model.predict(future)
         return forecast[['ds', 'yhat']].tail(periods)

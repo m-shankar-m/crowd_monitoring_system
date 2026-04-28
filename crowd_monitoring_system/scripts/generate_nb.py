@@ -109,7 +109,7 @@ notebook = {
     "nbformat_minor": 4
 }
 
-with open("d:/VS Code/crowd prodiction/crowd_monitoring_system/notebooks/train_models.ipynb", "w") as f:
+with open("notebooks/train_models.ipynb", "w") as f:
     json.dump(notebook, f, indent=2)
 
 print("Notebook generated!")

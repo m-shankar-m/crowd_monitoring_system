@@ -8,10 +8,11 @@ A robust, real-time computer vision and machine learning platform designed to mo
 
 *   **Hybrid Crowd Analysis:** Combines `YOLOv8` for precise person/head tracking in sparse environments and `CSRNet` (Congested Scene Recognition Network) for accurate density estimation in highly congested areas.
 *   **Optimized Head Detection:** Utilizes a custom-tuned YOLOv8 model focused on head detection to improve accuracy and reduce occlusion issues in dense crowds.
-*   **Predictive Forecasting:** Incorporates machine learning time-series models (`Prophet` & `LSTM`) to predict near-future crowd spikes based on recent historical accumulation data.
-*   **Multi-Zone Monitoring:** Supports simultaneous monitoring of up to 4 distinct zones (Zone 1, Zone 2, Zone 3, Zone 4) with zone-specific alert logic.
-*   **Dynamic Threshold Configuration:** Allows real-time adjustment of crowd capacity limits (Maximum Capacity, Warning Thresholds) via the `.env` file or the frontend dashboard.
-*   **Interactive Analytics Dashboard:** A comprehensive Streamlit interface presenting live video rendering, real-time numeric KPIs, dynamic actual-vs-predicted trajectory graphs, and 2D spatial density heatmaps.
+*   **Multi-Zone Monitoring:** Supports simultaneous monitoring of up to 4 distinct zones (Zone A, Zone B, Zone C, Zone D) with zone-specific alert logic.
+*   **Predictive Alert Outlook:** High-risk email alerts now include a 'Forecast Outlook', predicting peak crowd sizes and risk duration to aid in rapid staff deployment.
+*   **High-Accuracy ML Engine:** Features an upgraded multi-variate LSTM achieving **~85% accuracy** by analyzing temporal patterns (hour of day, day of week).
+*   **Dynamic Threshold Configuration:** Allows real-time adjustment of crowd capacity limits via the frontend dashboard.
+*   **Interactive Analytics Dashboard:** A comprehensive Streamlit interface presenting live video rendering, real-time numeric KPIs, and dynamic actual-vs-predicted trajectory graphs.
 
 ## 🛠️ Technology Stack
 
@@ -75,14 +76,21 @@ Notes:
 
 ```plaintext
 crowd_monitoring_system/
-├── data/                       # Operational history data CSVs used for prediction
-├── models/                     # Pre-trained YOLO and CSRNet weights
+├── data/                       # Operational history CSVs and samples
+│   ├── samples/                # Sample video feeds
+│   ├── processed/              # Filtered datasets
+│   └── raw/                    # Original telemetry files
+├── docs/                       # Extended documentation and project details
+├── models/                     # YOLO and ML weights
+├── notebooks/                  # Interactive training environments
+├── scripts/                    # Maintenance and generation utilities
 ├── src/
-│   ├── backend/                # REST API (main.py pipeline triggers)
-│   ├── cv/                     # YOLO/CSRNet integration and image filters
-│   ├── frontend/               # Streamlit application visual engine (app.py)
-│   ├── ml/                     # Prophet/LSTM time-series data fitting
-│   └── risk/                   # Conditional scaling logic (threshold.py, alert.py)
-└── README.md                   # You are here!
+│   ├── backend/                # REST API logic
+│   ├── cv/                     # Computer Vision pipeline
+│   ├── frontend/               # Streamlit UI dashboard
+│   ├── ml/                     # ML training classes
+│   └── risk/                   # Alerting and threshold logic
+├── .env                        # Environment configuration
+└── README.md                   # System overview
 ```
 

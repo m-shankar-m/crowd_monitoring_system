@@ -16,7 +16,7 @@ class CVPipeline:
         if not os.path.exists(self.csv_path):
             with open(self.csv_path, 'w', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow(['timestamp', 'count'])
+                writer.writerow(['timestamp', 'hour', 'day', 'count'])
 
     def process_frame(self, frame):
         boxes = self.detector.detect(frame)
@@ -31,9 +31,13 @@ class CVPipeline:
         
         current_time = time.time()
         if current_time - self.last_log_time >= 2:
+            now = time.localtime()
+            ts = time.strftime("%Y-%m-%d %H:%M:%S", now)
+            hour = now.tm_hour
+            day = now.tm_wday # Monday is 0
             with open(self.csv_path, 'a', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow([time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()), smoothed_count])
+                writer.writerow([ts, hour, day, smoothed_count])
             self.last_log_time = current_time
             
         return {"count": smoothed_count, "tracks": tracks}

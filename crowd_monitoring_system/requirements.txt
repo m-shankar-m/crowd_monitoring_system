@@ -10,3 +10,4 @@ streamlit-webrtc
 python-multipart
 requests
 python-dotenv
+pytest
