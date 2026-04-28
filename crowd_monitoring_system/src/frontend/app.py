@@ -20,8 +20,9 @@ def is_port_in_use(port):
 
 if 'backend_started' not in st.session_state:
     if not is_port_in_use(8000):
-        # Start FastAPI backend process
-        subprocess.Popen([sys.executable, "-m", "uvicorn", "src.backend.main:app", "--port", "8000"])
+        # Start FastAPI backend process with correct working directory
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+        subprocess.Popen([sys.executable, "-m", "uvicorn", "src.backend.main:app", "--port", "8000"], cwd=backend_dir)
         time.sleep(3) # Wait for backend to spin up
     st.session_state.backend_started = True
 
