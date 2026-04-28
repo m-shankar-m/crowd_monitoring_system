@@ -1,0 +1,13 @@
+ultralytics
+opencv-python-headless
+pandas
+prophet
+fastapi
+uvicorn
+streamlit
+plotly
+streamlit-webrtc
+python-multipart
+requests
+python-dotenv
+pytest
