@@ -20,9 +20,16 @@ def is_port_in_use(port):
 
 if 'backend_started' not in st.session_state:
     if not is_port_in_use(8000):
-        # Start FastAPI backend process with correct working directory
+        # Start FastAPI backend process with correct working directory and secrets
         backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-        subprocess.Popen([sys.executable, "-m", "uvicorn", "src.backend.main:app", "--port", "8000"], cwd=backend_dir)
+        
+        # Inject Streamlit secrets so the backend can read email credentials
+        env_vars = os.environ.copy()
+        if hasattr(st, "secrets"):
+            for k, v in st.secrets.items():
+                env_vars[k] = str(v)
+                
+        subprocess.Popen([sys.executable, "-m", "uvicorn", "src.backend.main:app", "--port", "8000"], cwd=backend_dir, env=env_vars)
         time.sleep(3) # Wait for backend to spin up
     st.session_state.backend_started = True
 
@@ -400,7 +407,7 @@ elif input_source == "Live Camera":
             except Exception:
                 pass
 
-st.sidebar.markdown("### 🧠 Model & System Management")
+st.sidebar.markdown("### 🧠 Model Management")
 if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophet on latest data"):
     with st.spinner("Training models... this may take 1-2 minutes"):
         result = train_model()
@@ -408,22 +415,6 @@ if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophe
             st.sidebar.success("Models trained successfully!")
         else:
             st.sidebar.error(f"Training failed: {result.get('message') if result else 'Server error'}")
-
-if st.sidebar.button("Test Email Alert", help="Send a test email using the configured secrets"):
-    import requests
-    with st.spinner("Sending test email..."):
-        try:
-            resp = requests.get("http://127.0.0.1:8000/test-email-alert?count=99&max_capacity=50&zone_name=TestZone", timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("email", {}).get("sent"):
-                    st.sidebar.success("✅ Test email sent successfully!")
-                else:
-                    st.sidebar.error(f"❌ Failed to send: {data.get('email', {}).get('reason')}")
-            else:
-                st.sidebar.error("❌ Backend error.")
-        except Exception as e:
-            st.sidebar.error(f"❌ Connection error: {str(e)}")
 
 col1, col2 = st.sidebar.columns(2)
 if col1.button("Start Processing"):
