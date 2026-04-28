@@ -35,3 +35,13 @@ node_modules/
 # Data
 data/
 sample_video.mp4
+
+# Testing and Coverage
+.coverage
+.pytest_cache/
+htmlcov/
+coverage.xml
+
+# Scratch and Temp
+scratch/
+test1/
