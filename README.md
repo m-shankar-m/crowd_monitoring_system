@@ -1,3 +1,11 @@
+---
+title: Crowd Monitoring Backend
+emoji: 🏢
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+---
 # Crowd Monitoring & Prediction System
 
 A robust, real-time computer vision and machine learning platform designed to monitor crowd density from live video feeds, identify immediate safety thresholds, and forecast future density trends to preemptively highlight high-risk situations.
