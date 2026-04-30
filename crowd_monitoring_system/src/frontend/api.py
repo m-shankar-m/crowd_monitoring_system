@@ -15,7 +15,7 @@ def upload_frame(file_bytes, zone_name=None, max_capacity=25):
     try:
         files = {"file": ("frame.jpg", file_bytes, "image/jpeg")}
         params = {"zone_name": zone_name, "max_capacity": max_capacity}
-        resp = requests.post(f"{BASE_URL}/live-density", files=files, params=params, timeout=5)
+        resp = requests.post(f"{BASE_URL}/live-density", files=files, params=params, timeout=60)
         return resp.json() if resp.status_code == 200 else None
     except:
         return None
