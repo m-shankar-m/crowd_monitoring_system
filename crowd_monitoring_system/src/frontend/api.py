@@ -1,6 +1,15 @@
+import os
 import requests
+import streamlit as st
 
-BASE_URL = "http://127.0.0.1:8000"
+# Check if Streamlit secrets are available, otherwise use environment variable or fallback to local
+try:
+    if "API_URL" in st.secrets:
+        BASE_URL = st.secrets["API_URL"]
+    else:
+        BASE_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
+except Exception:
+    BASE_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
 def upload_frame(file_bytes, zone_name=None, max_capacity=25):
     try:

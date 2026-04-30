@@ -10,28 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
 from src.frontend.api import upload_frame, get_forecast, train_model
-import subprocess
-import socket
-
-# Automatically start the backend if port 8000 is not in use (e.g. on Streamlit Cloud)
-def is_port_in_use(port):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('127.0.0.1', port)) == 0
-
-if 'backend_started' not in st.session_state:
-    if not is_port_in_use(8000):
-        # Start FastAPI backend process with correct working directory and secrets
-        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-        
-        # Inject Streamlit secrets so the backend can read email credentials
-        env_vars = os.environ.copy()
-        if hasattr(st, "secrets"):
-            for k, v in st.secrets.items():
-                env_vars[k] = str(v)
-                
-        subprocess.Popen([sys.executable, "-m", "uvicorn", "src.backend.main:app", "--port", "8000"], cwd=backend_dir, env=env_vars)
-        time.sleep(3) # Wait for backend to spin up
-    st.session_state.backend_started = True
+st.session_state.backend_started = True
 
 st.set_page_config(page_title="Crowd Predictor Framework", layout="wide", initial_sidebar_state="collapsed")
 
