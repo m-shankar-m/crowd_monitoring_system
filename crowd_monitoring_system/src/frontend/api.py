@@ -22,7 +22,7 @@ def upload_frame(file_bytes, zone_name=None, max_capacity=25):
 
 def train_model():
     try:
-        resp = requests.post(f"{BASE_URL}/train", timeout=30)
+        resp = requests.post(f"{BASE_URL}/train", timeout=300)
         return resp.json()
     except:
         return None
