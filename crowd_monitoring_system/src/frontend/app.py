@@ -19,21 +19,40 @@ from email.message import EmailMessage
 # --- Email Alert Logic ---
 _last_high_alert_ts_by_zone = {}
 
+def _get_cred(key, default=""):
+    if 'email_creds' in st.session_state and key in st.session_state.email_creds and st.session_state.email_creds[key]:
+        return st.session_state.email_creds[key]
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+    val = os.getenv(key)
+    if val: return val
+    try:
+        if hasattr(st, "secrets") and key in st.secrets and st.secrets[key]:
+            return st.secrets[key]
+    except Exception:
+        pass
+    return default
+
 def _send_high_alert_email_frontend(count, message, zone_name="Unknown", forecast_info=None):
     global _last_high_alert_ts_by_zone
     
+    email_to = _get_cred("ALERT_EMAIL_TO")
+    email_from = _get_cred("ALERT_EMAIL_FROM")
+    email_password = _get_cred("ALERT_EMAIL_PASSWORD")
+    
+    if not email_from or not email_password:
+        return {"sent": False, "reason": "email_not_configured: credentials missing"}
+        
+    smtp_host = _get_cred("ALERT_SMTP_HOST", "smtp.gmail.com")
     try:
-        if "ALERT_EMAIL_FROM" not in st.secrets:
-            return {"sent": False, "reason": "email_not_configured: secrets not found"}
-            
-        email_to = st.secrets["ALERT_EMAIL_TO"]
-        email_from = st.secrets["ALERT_EMAIL_FROM"]
-        email_password = st.secrets["ALERT_EMAIL_PASSWORD"]
-        smtp_host = st.secrets.get("ALERT_SMTP_HOST", "smtp.gmail.com")
-        smtp_port = int(st.secrets.get("ALERT_SMTP_PORT", 465))
-        email_cooldown_seconds = int(st.secrets.get("ALERT_EMAIL_COOLDOWN_SECONDS", 60))
-    except Exception as e:
-        return {"sent": False, "reason": f"email_not_configured: {str(e)}"}
+        smtp_port = int(_get_cred("ALERT_SMTP_PORT", 465))
+        email_cooldown_seconds = int(_get_cred("ALERT_EMAIL_COOLDOWN_SECONDS", 60))
+    except ValueError:
+        smtp_port = 465
+        email_cooldown_seconds = 60
 
     now = int(time.time())
     last_ts = _last_high_alert_ts_by_zone.get(zone_name, 0)
@@ -495,23 +514,24 @@ elif input_source == "Live Camera":
 
 st.sidebar.markdown("### 📧 Alert System Configuration")
 with st.sidebar.expander("Email Settings"):
-    default_to, default_from, default_pass = "", "", ""
-    try:
-        if hasattr(st, "secrets"):
-            default_to = st.secrets.get("ALERT_EMAIL_TO", "")
-            default_from = st.secrets.get("ALERT_EMAIL_FROM", "")
-            default_pass = st.secrets.get("ALERT_EMAIL_PASSWORD", "")
-    except Exception:
-        pass
+    default_to = _get_cred("ALERT_EMAIL_TO")
+    default_from = _get_cred("ALERT_EMAIL_FROM")
+    default_pass = _get_cred("ALERT_EMAIL_PASSWORD")
         
     e_to = st.text_input("Send Alerts To", value=default_to)
     e_from = st.text_input("Send From Email", value=default_from)
     e_pass = st.text_input("App Password", type="password", value=default_pass)
     if st.button("Save Settings"):
+        if 'email_creds' not in st.session_state:
+            st.session_state.email_creds = {}
+        st.session_state.email_creds["ALERT_EMAIL_TO"] = e_to
+        st.session_state.email_creds["ALERT_EMAIL_FROM"] = e_from
+        st.session_state.email_creds["ALERT_EMAIL_PASSWORD"] = e_pass
+        
         if update_email_settings(e_to, e_from, e_pass):
-            st.success("Saved to backend!")
+            st.success("Saved to frontend & backend!")
         else:
-            st.error("Backend unreachable")
+            st.warning("Saved to frontend (backend unreachable)")
 
 st.sidebar.markdown("### 🧠 Model Management")
 if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophet on latest data"):
