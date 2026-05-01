@@ -484,6 +484,9 @@ if st.session_state.get('running', False) and input_source != "None":
     def add_footer(img, text):
         cv2.putText(img, text, (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 255, 200), 2)
         
+    if 'last_tracks' not in st.session_state:
+        st.session_state.last_tracks = [[] for _ in range(4)]
+        
     while True:
         zone_counts = [0, 0, 0, 0]
         frames = [None, None, None, None]
@@ -492,6 +495,12 @@ if st.session_state.get('running', False) and input_source != "None":
         for i in range(4):
             if caps[i] and caps[i].isOpened():
                 active_caps += 1
+                
+                # To speed up playback visually, we can read a few extra frames to skip ahead
+                # This ensures the video doesn't look like slow motion
+                for _ in range(2):
+                    caps[i].grab()
+                
                 ret, frame = caps[i].read()
                 if not ret:
                     caps[i].release()
@@ -500,31 +509,38 @@ if st.session_state.get('running', False) and input_source != "None":
                     
                 # Downscale individual feeds to maintain overall UI performance
                 frame = cv2.resize(frame, (480, 270))
-                is_success, buffer = cv2.imencode(".jpg", frame)
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
-                if is_success:
-                    res = upload_frame(buffer.tobytes(), zone_name=zones[i], max_capacity=user_caps[i])
-                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # OPTIMIZATION: Only hit the API every 4 processed frames (network latency bypass)
+                if frame_counter % 4 == 0:
+                    is_success, buffer = cv2.imencode(".jpg", frame)
                     
-                    if res:
-                        tracks = res.get('tracks', [])
-                        zone_counts[i] = len(tracks)
+                    if is_success:
+                        res = upload_frame(buffer.tobytes(), zone_name=zones[i], max_capacity=user_caps[i])
                         
-                        risk_info = res.get("risk", {})
-                        if risk_info.get("level") == "HIGH ALERT":
-                            _send_high_alert_email_frontend(
-                                count=zone_counts[i], 
-                                message=risk_info.get("message", "High crowd density"), 
-                                zone_name=zones[i], 
-                                forecast_info=None
-                            )
-                        
-                        for t in tracks:
-                            x1, y1, x2, y2 = t['bbox']
-                            cv2.rectangle(frame_rgb, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                        if res:
+                            tracks = res.get('tracks', [])
+                            st.session_state.last_tracks[i] = tracks
                             
-                    add_footer(frame_rgb, f"{zones[i]} - {zone_counts[i]} detected")
-                    frames[i] = frame_rgb
+                            risk_info = res.get("risk", {})
+                            if risk_info.get("level") == "HIGH ALERT":
+                                _send_high_alert_email_frontend(
+                                    count=len(tracks), 
+                                    message=risk_info.get("message", "High crowd density"), 
+                                    zone_name=zones[i], 
+                                    forecast_info=None
+                                )
+                                
+                # Always draw using the cached tracks for smooth video playback
+                tracks = st.session_state.last_tracks[i]
+                zone_counts[i] = len(tracks)
+                
+                for t in tracks:
+                    x1, y1, x2, y2 = t['bbox']
+                    cv2.rectangle(frame_rgb, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                        
+                add_footer(frame_rgb, f"{zones[i]} - {zone_counts[i]} detected")
+                frames[i] = frame_rgb
                     
         # Update layout images
         for i in range(4):
