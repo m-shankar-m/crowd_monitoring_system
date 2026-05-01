@@ -12,6 +12,80 @@ import pandas as pd
 from src.frontend.api import upload_frame, get_forecast, train_model
 st.session_state.backend_started = True
 
+import smtplib
+import ssl
+from email.message import EmailMessage
+
+# --- Email Alert Logic ---
+_last_high_alert_ts_by_zone = {}
+
+def _send_high_alert_email_frontend(count, message, zone_name="Unknown", forecast_info=None):
+    global _last_high_alert_ts_by_zone
+    
+    try:
+        if "ALERT_EMAIL_FROM" not in st.secrets:
+            return {"sent": False, "reason": "email_not_configured: secrets not found"}
+            
+        email_to = st.secrets["ALERT_EMAIL_TO"]
+        email_from = st.secrets["ALERT_EMAIL_FROM"]
+        email_password = st.secrets["ALERT_EMAIL_PASSWORD"]
+        smtp_host = st.secrets.get("ALERT_SMTP_HOST", "smtp.gmail.com")
+        smtp_port = int(st.secrets.get("ALERT_SMTP_PORT", 465))
+        email_cooldown_seconds = int(st.secrets.get("ALERT_EMAIL_COOLDOWN_SECONDS", 60))
+    except Exception as e:
+        return {"sent": False, "reason": f"email_not_configured: {str(e)}"}
+
+    now = int(time.time())
+    last_ts = _last_high_alert_ts_by_zone.get(zone_name, 0)
+    
+    if now - last_ts < email_cooldown_seconds:
+        return {"sent": False, "reason": "cooldown_active"}
+
+    _last_high_alert_ts_by_zone[zone_name] = now
+    
+    subject = f"High Crowd Alert - {zone_name} (Count {count})"
+    body = (
+        f"Critical crowd density threshold has been exceeded in {zone_name}.\n\n"
+        f"Zone: {zone_name}\n"
+        f"Risk Level: HIGH ALERT\n"
+        f"Count: {count}\n"
+        f"Message: {message}\n"
+        f"Time: {time.strftime('%Y-%m-%d %H:%M:%S')}\n"
+    )
+    
+    if forecast_info:
+        body += (
+            f"\n--- FORECAST OUTLOOK ---\n"
+            f"Peak Expected: {forecast_info.get('peak_prediction', 'N/A')} people\n"
+            f"High Risk Persists Until: {forecast_info.get('first_high_risk_time', 'N/A')}\n"
+            f"Recommendation: Immediate staff deployment suggested.\n"
+        )
+
+    email = EmailMessage()
+    email["From"] = email_from
+    email["To"] = email_to
+    email["Subject"] = subject
+    email.set_content(body)
+
+    try:
+        if smtp_port == 465:
+            context = ssl.create_default_context()
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, context=context, timeout=15) as smtp:
+                smtp.login(email_from, email_password)
+                smtp.send_message(email)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=15) as smtp:
+                smtp.ehlo()
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.ehlo()
+                smtp.login(email_from, email_password)
+                smtp.send_message(email)
+        return {"sent": True, "reason": "sent"}
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return {"sent": False, "reason": f"smtp_error: {str(e)}"}
+# --- End Email Alert Logic ---
+
 st.set_page_config(page_title="Crowd Predictor Framework", layout="wide", initial_sidebar_state="collapsed")
 
 # Inject Custom CSS
@@ -435,6 +509,15 @@ if st.session_state.get('running', False) and input_source != "None":
                     if res:
                         tracks = res.get('tracks', [])
                         zone_counts[i] = len(tracks)
+                        
+                        risk_info = res.get("risk", {})
+                        if risk_info.get("level") == "HIGH ALERT":
+                            _send_high_alert_email_frontend(
+                                count=zone_counts[i], 
+                                message=risk_info.get("message", "High crowd density"), 
+                                zone_name=zones[i], 
+                                forecast_info=None
+                            )
                         
                         for t in tracks:
                             x1, y1, x2, y2 = t['bbox']

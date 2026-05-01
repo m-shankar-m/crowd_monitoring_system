@@ -100,16 +100,9 @@ def generate_alert(count, zone_name="Unknown", max_capacity=25, forecast_info=No
 
     email_status = {"sent": False, "reason": "not_high_alert"}
     if level == "HIGH ALERT":
-        try:
-            email_status = _send_high_alert_email(count, message, zone_name, forecast_info)
-        except Exception as exc:
-            reason = str(exc)
-            if "BadCredentials" in reason or "535" in reason:
-                reason = "authentication_failed (Check Gmail App Password and 2FA status)"
-            elif "Connection unexpectedly closed" in reason:
-                reason = "connection_error (Possible rate limiting or local network block)"
-            email_status = {"sent": False, "reason": f"email_error: {reason}"}
-            
+        # Email logic moved to frontend to bypass Hugging Face outbound port blocks
+        email_status = {"sent": False, "reason": "handled_by_frontend"}
+        
         with open(LOG_PATH, "a") as f:
             f.write(
                 f"{time.strftime('%Y-%m-%d %H:%M:%S')} - EMAIL_STATUS [{zone_name}]: "
