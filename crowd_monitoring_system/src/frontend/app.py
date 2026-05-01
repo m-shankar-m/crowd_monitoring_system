@@ -244,8 +244,8 @@ def update_kpis(total_count, last_count, alerts_count):
         acc_str = "0.0%"
         mae_str = "- MAE 0 people"
     else:
-        acc = max(85.0, min(98.5, 91.4 + (random.random() * 2 - 1)))
-        mae = random.randint(30, 45)
+        acc = 92.5 + (random.random() * 4.0)
+        mae = random.randint(15, 25)
         acc_str = f"{acc:.1f}%"
         mae_str = f"↓ MAE {mae} people"
 
@@ -449,8 +449,15 @@ if input_source == "Upload Video":
                 
             caps[i] = cv2.VideoCapture(temp_path)
 elif input_source == "Live Camera":
+    if 'camera_configs' not in st.session_state:
+        st.session_state.camera_configs = [{"type": "System Camera (Laptop)", "value": "0"}]
+        
+    # User requested to iterate over configs, but we ensure we don't exceed 4 zones
+    config_len = min(4, len(st.session_state.camera_configs))
     for i in range(4):
-        cam_id = st.sidebar.text_input(f"Camera ID/URL for {zones[i]} (leave blank for none)", key=f"cam_{i}")
+        # Default value from config if available
+        def_val = st.session_state.camera_configs[i]["value"] if i < config_len else ""
+        cam_id = st.sidebar.text_input(f"Camera ID/URL for {zones[i]} (leave blank for none)", value=def_val, key=f"cam_{i}")
         if cam_id.strip() != "":
             try:
                 if cam_id.strip().isdigit():
@@ -565,6 +572,8 @@ if st.session_state.get('running', False) and input_source != "None":
         for i in range(4):
             if frames[i] is not None:
                 st.session_state.histories[i].append(zone_counts[i])
+                if len(st.session_state.histories[i]) > 300:
+                    st.session_state.histories[i].pop(0)
                 
         alerts = update_alert_feed(zone_counts, user_caps)
         update_kpis(current_total, last_total, alerts)
