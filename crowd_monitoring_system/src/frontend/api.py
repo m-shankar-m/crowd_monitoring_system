@@ -33,3 +33,16 @@ def get_forecast():
         return resp.json()
     except:
         return None
+
+def update_email_settings(email_to, email_from, email_password):
+    """Update email settings on the backend for alert configuration"""
+    try:
+        data = {
+            "email_to": email_to,
+            "email_from": email_from,
+            "email_password": email_password
+        }
+        resp = requests.post(f"{BASE_URL}/update-email-settings", json=data)
+        return resp.status_code == 200
+    except:
+        return False

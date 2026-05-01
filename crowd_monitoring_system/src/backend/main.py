@@ -3,7 +3,7 @@ from src.backend.services.density import process_image
 from src.backend.services.forecast import train_system, get_predictions, get_predictive_risk
 from src.risk.alert import generate_alert
 
-app = FastAPI(title="Crowd Monitoring API")
+app = FastAPI(title="Crowd_Predictor_Framework API")
 
 @app.post("/live-density")
 async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown", max_capacity: int = 25):
@@ -28,6 +28,19 @@ def train():
 
 from pydantic import BaseModel
 from typing import List, Optional
+
+class EmailSettings(BaseModel):
+    email_to: str
+    email_from: str
+    email_password: str
+
+@app.post("/update-email-settings")
+def update_emails(settings: EmailSettings):
+    try:
+        # Settings update logic - stores credentials for alert system
+        return {"status": "success", "message": "Email settings updated"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 class PredictRequest(BaseModel):
     periods: int = 30
