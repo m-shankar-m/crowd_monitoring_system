@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 import plotly.graph_objects as go
 import pandas as pd
-from src.frontend.api import upload_frame, get_forecast, train_model
+from src.frontend.api import upload_frame, get_forecast, train_model, update_email_settings
 st.session_state.backend_started = True
 
 import smtplib
@@ -452,20 +452,57 @@ elif input_source == "Live Camera":
     if 'camera_configs' not in st.session_state:
         st.session_state.camera_configs = [{"type": "System Camera (Laptop)", "value": "0"}]
         
-    # User requested to iterate over configs, but we ensure we don't exceed 4 zones
-    config_len = min(4, len(st.session_state.camera_configs))
-    for i in range(4):
-        # Default value from config if available
-        def_val = st.session_state.camera_configs[i]["value"] if i < config_len else ""
-        cam_id = st.sidebar.text_input(f"Camera ID/URL for {zones[i]} (leave blank for none)", value=def_val, key=f"cam_{i}")
-        if cam_id.strip() != "":
+    for i, config in enumerate(st.session_state.camera_configs):
+        st.sidebar.markdown(f"**Zone {chr(65+i)}/{i+1} Feed Configuration**")
+        cam_type = st.sidebar.selectbox(
+            "Camera Type", 
+            ["System Camera (Laptop)", "USB Web Camera", "CCTV Stream (RTSP)"],
+            index=["System Camera (Laptop)", "USB Web Camera", "CCTV Stream (RTSP)"].index(config.get("type", "System Camera (Laptop)")) if config.get("type", "System Camera (Laptop)") in ["System Camera (Laptop)", "USB Web Camera", "CCTV Stream (RTSP)"] else 0,
+            key=f"cam_type_{i}"
+        )
+        
+        if cam_type == "System Camera (Laptop)":
+            st.sidebar.caption("Using built-in laptop camera.")
+            config["value"] = "0"
+            config["type"] = cam_type
+        elif cam_type == "USB Web Camera":
+            st.sidebar.caption("Using external USB camera.")
+            config["value"] = "1"
+            config["type"] = cam_type
+        else:
+            cam_val = st.sidebar.text_input("Stream URL", value=config.get("value", ""), key=f"cam_val_{i}")
+            config["value"] = cam_val
+            config["type"] = cam_type
+            
+        st.session_state.camera_configs[i] = config
+        
+        # Load the camera
+        val = config["value"]
+        if val.strip() != "":
             try:
-                if cam_id.strip().isdigit():
-                    caps[i] = cv2.VideoCapture(int(cam_id.strip()))
+                if val.strip().isdigit():
+                    caps[i] = cv2.VideoCapture(int(val.strip()))
                 else:
-                    caps[i] = cv2.VideoCapture(cam_id.strip())
+                    caps[i] = cv2.VideoCapture(val.strip())
             except Exception:
                 pass
+                
+    st.sidebar.markdown("---")
+    if len(st.session_state.camera_configs) < 4:
+        if st.sidebar.button("➕ Add Another Camera"):
+            st.session_state.camera_configs.append({"type": "System Camera (Laptop)", "value": ""})
+            st.experimental_rerun()
+
+st.sidebar.markdown("### 📧 Alert System Configuration")
+with st.sidebar.expander("Email Settings"):
+    e_to = st.text_input("Send Alerts To", value=st.secrets.get("ALERT_EMAIL_TO", "") if hasattr(st, "secrets") and "ALERT_EMAIL_TO" in st.secrets else "")
+    e_from = st.text_input("Send From Email", value=st.secrets.get("ALERT_EMAIL_FROM", "") if hasattr(st, "secrets") and "ALERT_EMAIL_FROM" in st.secrets else "")
+    e_pass = st.text_input("App Password", type="password", value=st.secrets.get("ALERT_EMAIL_PASSWORD", "") if hasattr(st, "secrets") and "ALERT_EMAIL_PASSWORD" in st.secrets else "")
+    if st.button("Save Settings"):
+        if update_email_settings(e_to, e_from, e_pass):
+            st.success("Saved to backend!")
+        else:
+            st.error("Backend unreachable")
 
 st.sidebar.markdown("### 🧠 Model Management")
 if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophet on latest data"):
