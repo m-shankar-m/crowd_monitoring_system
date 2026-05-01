@@ -495,9 +495,18 @@ elif input_source == "Live Camera":
 
 st.sidebar.markdown("### 📧 Alert System Configuration")
 with st.sidebar.expander("Email Settings"):
-    e_to = st.text_input("Send Alerts To", value=st.secrets.get("ALERT_EMAIL_TO", "") if hasattr(st, "secrets") and "ALERT_EMAIL_TO" in st.secrets else "")
-    e_from = st.text_input("Send From Email", value=st.secrets.get("ALERT_EMAIL_FROM", "") if hasattr(st, "secrets") and "ALERT_EMAIL_FROM" in st.secrets else "")
-    e_pass = st.text_input("App Password", type="password", value=st.secrets.get("ALERT_EMAIL_PASSWORD", "") if hasattr(st, "secrets") and "ALERT_EMAIL_PASSWORD" in st.secrets else "")
+    default_to, default_from, default_pass = "", "", ""
+    try:
+        if hasattr(st, "secrets"):
+            default_to = st.secrets.get("ALERT_EMAIL_TO", "")
+            default_from = st.secrets.get("ALERT_EMAIL_FROM", "")
+            default_pass = st.secrets.get("ALERT_EMAIL_PASSWORD", "")
+    except Exception:
+        pass
+        
+    e_to = st.text_input("Send Alerts To", value=default_to)
+    e_from = st.text_input("Send From Email", value=default_from)
+    e_pass = st.text_input("App Password", type="password", value=default_pass)
     if st.button("Save Settings"):
         if update_email_settings(e_to, e_from, e_pass):
             st.success("Saved to backend!")
