@@ -12,6 +12,23 @@ import pandas as pd
 from src.frontend.api import upload_frame, get_forecast, train_model, update_email_settings
 st.session_state.backend_started = True
 
+import threading
+from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
+
+# --- WebRTC Shared State ---
+lock = threading.Lock()
+img_container = {"img": None}
+
+def video_frame_callback(frame):
+    img = frame.to_ndarray(format="bgr24")
+    with lock:
+        img_container["img"] = img
+    return frame
+
+RTC_CONFIG = RTCConfiguration(
+    {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
+)
+
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -469,19 +486,34 @@ if input_source == "Upload Video":
             caps[i] = cv2.VideoCapture(temp_path)
 elif input_source == "Live Camera":
     if 'camera_configs' not in st.session_state:
-        st.session_state.camera_configs = [{"type": "System Camera (Laptop)", "value": "0"}]
+        st.session_state.camera_configs = [{"type": "Browser Camera (WebRTC)", "value": "webrtc"}]
         
     for i, config in enumerate(st.session_state.camera_configs):
         st.sidebar.markdown(f"**Zone {chr(65+i)}/{i+1} Feed Configuration**")
         cam_type = st.sidebar.selectbox(
             "Camera Type", 
-            ["System Camera (Laptop)", "USB Web Camera", "CCTV Stream (RTSP)"],
-            index=["System Camera (Laptop)", "USB Web Camera", "CCTV Stream (RTSP)"].index(config.get("type", "System Camera (Laptop)")) if config.get("type", "System Camera (Laptop)") in ["System Camera (Laptop)", "USB Web Camera", "CCTV Stream (RTSP)"] else 0,
+            ["Browser Camera (WebRTC)", "System Camera (Local Only)", "USB Web Camera", "CCTV Stream (RTSP)"],
+            index=["Browser Camera (WebRTC)", "System Camera (Local Only)", "USB Web Camera", "CCTV Stream (RTSP)"].index(config.get("type", "Browser Camera (WebRTC)")) if config.get("type", "Browser Camera (WebRTC)") in ["Browser Camera (WebRTC)", "System Camera (Local Only)", "USB Web Camera", "CCTV Stream (RTSP)"] else 0,
             key=f"cam_type_{i}"
         )
         
-        if cam_type == "System Camera (Laptop)":
-            st.sidebar.caption("Using built-in laptop camera.")
+        if cam_type == "Browser Camera (WebRTC)":
+            st.sidebar.caption("Recommended for HuggingFace/Streamlit Cloud.")
+            config["value"] = "webrtc"
+            config["type"] = cam_type
+            
+            # Show the WebRTC component in the sidebar for this zone
+            webrtc_streamer(
+                key=f"webrtc_{i}",
+                mode=WebRtcMode.SENDRECV,
+                rtc_configuration=RTC_CONFIG,
+                video_frame_callback=video_frame_callback,
+                media_stream_constraints={"video": True, "audio": False},
+            )
+            caps[i] = "webrtc" # Sentinel value
+            
+        elif cam_type == "System Camera (Local Only)":
+            st.sidebar.caption("Works only when running on your local machine.")
             config["value"] = "0"
             config["type"] = cam_type
         elif cam_type == "USB Web Camera":
@@ -495,16 +527,17 @@ elif input_source == "Live Camera":
             
         st.session_state.camera_configs[i] = config
         
-        # Load the camera
-        val = config["value"]
-        if val.strip() != "":
-            try:
-                if val.strip().isdigit():
-                    caps[i] = cv2.VideoCapture(int(val.strip()))
-                else:
-                    caps[i] = cv2.VideoCapture(val.strip())
-            except Exception:
-                pass
+        # Load the camera if not webrtc
+        if config["value"] != "webrtc":
+            val = config["value"]
+            if val.strip() != "":
+                try:
+                    if val.strip().isdigit():
+                        caps[i] = cv2.VideoCapture(int(val.strip()))
+                    else:
+                        caps[i] = cv2.VideoCapture(val.strip())
+                except Exception:
+                    pass
                 
     st.sidebar.markdown("---")
     if len(st.session_state.camera_configs) < 4:
@@ -566,7 +599,19 @@ if st.session_state.get('running', False) and input_source != "None":
         active_caps = 0
         
         for i in range(4):
-            if caps[i] and caps[i].isOpened():
+            frame = None
+            if caps[i] == "webrtc":
+                active_caps += 1
+                with lock:
+                    if img_container["img"] is not None:
+                        frame = img_container["img"].copy()
+                
+                if frame is None:
+                    # Wait a bit for the first frame
+                    time.sleep(0.1)
+                    continue
+            
+            elif caps[i] and caps[i].isOpened():
                 active_caps += 1
                 
                 # To speed up playback visually, we can read a few extra frames to skip ahead
@@ -579,6 +624,8 @@ if st.session_state.get('running', False) and input_source != "None":
                     caps[i].release()
                     caps[i] = None
                     continue
+            
+            if frame is not None:
                     
                 # Downscale individual feeds to maintain overall UI performance
                 frame = cv2.resize(frame, (480, 270))
