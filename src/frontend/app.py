@@ -546,15 +546,18 @@ elif input_source == "Live Camera":
             config["value"] = "webrtc"
             config["type"] = cam_type
             
-            # Show the WebRTC component in the sidebar for this zone
-            webrtc_streamer(
-                key=f"webrtc_{i}",
-                mode=WebRtcMode.SENDRECV,
-                rtc_configuration=RTC_CONFIG,
-                video_frame_callback=get_webrtc_callback(i),
-                media_stream_constraints={"video": True, "audio": False},
-                async_processing=True,
-            )
+            try:
+                # Show the WebRTC component in the sidebar for this zone
+                webrtc_streamer(
+                    key=f"webrtc_{i}",
+                    mode=WebRtcMode.SENDRECV,
+                    rtc_configuration=RTC_CONFIG,
+                    video_frame_callback=get_webrtc_callback(i),
+                    media_stream_constraints={"video": True, "audio": False},
+                    async_processing=True,
+                )
+            except Exception as e:
+                st.sidebar.error(f"WebRTC Failed: {e}")
             caps[i] = "webrtc" # Sentinel value
             
         elif cam_type == "System Camera (Local Only)":
