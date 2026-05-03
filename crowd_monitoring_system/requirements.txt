@@ -1,14 +1,12 @@
-opencv-contrib-python-headless
-streamlit-webrtc>=0.47.1
-tornado==6.3.3
+streamlit
+streamlit-webrtc
+opencv-python-headless
 ultralytics
 pandas
 prophet
 fastapi
 uvicorn
-streamlit
 plotly
 python-multipart
 requests
 python-dotenv
-pytest
