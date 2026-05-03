@@ -12,7 +12,7 @@ class PersonDetector:
             
     def detect(self, image):
         # Reduced image size and switched to nano model to save RAM
-        results = self.model(image, classes=[0], imgsz=640, conf=0.15, iou=0.45, verbose=False) 
+        results = self.model(image, classes=[0], imgsz=640, conf=0.10, iou=0.45, verbose=False) 
         boxes = []
         if len(results) > 0:
             for box in results[0].boxes:
