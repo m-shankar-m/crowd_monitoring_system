@@ -24,11 +24,11 @@ class Tracker:
                     
             if best_id != -1:
                 new_objects[best_id] = (cx, cy)
-                tracks.append({"id": best_id, "bbox": box[:4]})
+                tracks.append({"id": best_id, "bbox": box[:4].tolist() if hasattr(box, "tolist") else list(box[:4])})
                 del self.objects[best_id]
             else:
                 new_objects[self.next_id] = (cx, cy)
-                tracks.append({"id": self.next_id, "bbox": box[:4]})
+                tracks.append({"id": self.next_id, "bbox": box[:4].tolist() if hasattr(box, "tolist") else list(box[:4])})
                 self.next_id += 1
                 
         self.objects = new_objects
