@@ -688,7 +688,7 @@ if st.session_state.get('running', False) and input_source != "None":
                         # Fallback to Local AI
                         boxes = local_detector.detect(frame)
                         zone_counts[i] = len(boxes)
-                        tracks = [{"bbox": b} for b in boxes]
+                        tracks = [{"bbox": b.tolist() if hasattr(b, "tolist") else b} for b in boxes]
                     else:
                         tracks = []
                         zone_counts[i] = 0

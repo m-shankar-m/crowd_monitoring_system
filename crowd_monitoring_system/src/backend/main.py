@@ -38,7 +38,13 @@ async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown",
         results["risk"] = alert_info
         return results
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        print(f"ERROR processing live-density: {str(e)}")
+        return {
+            "count": 0,
+            "tracks": [],
+            "error": "Backend Error",
+            "detail": str(e)
+        }
 
 @app.post("/train")
 def train():
