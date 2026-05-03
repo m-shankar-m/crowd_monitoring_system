@@ -2,7 +2,14 @@ import sys
 import os
 import time
 import random
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+
+# Add project root to sys.path to ensure absolute imports work in cloud
+try:
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+except:
+    pass
 
 import streamlit as st
 import cv2
@@ -31,16 +38,14 @@ RTC_CONFIG = RTCConfiguration(
     {"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]}
 )
 
+# Shared Debug Container
+DEBUG_INFO = {"error": None, "last_call": None}
+
 # Robust Analysis Handler (Direct Fallback for Cloud)
 def get_analysis(image_bytes, zone_name, max_capacity):
-    # 1. Try HTTP API (Localhost)
-    try:
-        res = upload_frame(image_bytes, zone_name=zone_name, max_capacity=max_capacity)
-        if res: return res
-    except:
-        pass
-        
-    # 2. Fallback to Direct Import (Robust for Cloud/Docker)
+    DEBUG_INFO["last_call"] = f"Zone {zone_name} @ {time.strftime('%H:%M:%S')}"
+    
+    # 1. Try Direct Import (Prioritize for Cloud/Self-Contained)
     try:
         from src.backend.services.density import process_image
         from src.risk.alert import generate_alert
@@ -49,15 +54,23 @@ def get_analysis(image_bytes, zone_name, max_capacity):
         results = process_image(image_bytes, zone_name=zone_name)
         
         forecast_info = None
-        if results["count"] > 0.5 * max_capacity:
+        if results.get("count", 0) > 0.5 * max_capacity:
             forecast_info = get_predictive_risk(periods=15)
             
         alert_info = generate_alert(results["count"], zone_name, max_capacity, forecast_info)
         results["risk"] = alert_info
         return results
     except Exception as e:
-        print(f"Direct Backend Error: {e}")
-        return None
+        DEBUG_INFO["error"] = f"Processing Error: {str(e)}"
+        
+        # 2. Try HTTP API (Last Resort)
+        try:
+            res = upload_frame(image_bytes, zone_name=zone_name, max_capacity=max_capacity)
+            if res: return res
+        except:
+            pass
+            
+    return None
 
 import smtplib
 import ssl
@@ -408,11 +421,12 @@ def update_alert_feed(counts, caps):
 
 def get_zone_forecast(history):
     if not history: return None
-    import requests
+    # Use direct backend forecasting
     try:
-        r = requests.post("http://127.0.0.1:8000/predict-zone", json={"periods": 15, "history_counts": history[-100:]})
-        return r.json()
-    except Exception:
+        from src.backend.services.forecast import get_predictive_risk
+        return get_predictive_risk(periods=15, history_counts=history)
+    except Exception as e:
+        DEBUG_INFO["error"] = f"Forecast Error: {str(e)}"
         return None
 
 def render_graphs(histories):
@@ -570,7 +584,13 @@ elif input_source == "Live Camera":
                 except Exception:
                     pass
                 
-    st.sidebar.markdown("---")
+    # Developer Debug Info
+    if DEBUG_INFO["error"]:
+        with st.sidebar.expander("🛠️ Developer Debug", expanded=True):
+            st.error(DEBUG_INFO["error"])
+            st.write(f"Last Call: {DEBUG_INFO['last_call']}")
+            st.button("Clear Error", on_click=lambda: DEBUG_INFO.update({"error": None}))
+    
     if len(st.session_state.camera_configs) < 4:
         if st.sidebar.button("➕ Add Another Camera"):
             st.session_state.camera_configs.append({"type": "System Camera (Laptop)", "value": ""})
