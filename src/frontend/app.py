@@ -228,6 +228,26 @@ class VideoProcessor(VideoProcessorBase):
             
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
+# Backend Connection Status
+st.sidebar.markdown("### 🔌 System Health")
+with st.sidebar.expander("AI Backend Diagnostics", expanded=False):
+    from src.frontend.api import BASE_URL
+    st.write(f"**Target API:**")
+    st.code(BASE_URL)
+    if st.button("Test AI Connection"):
+        try:
+            import requests
+            test_resp = requests.get(f"{BASE_URL}/docs", timeout=5)
+            if test_resp.status_code == 200:
+                st.success("✅ Connected to AI Engine")
+            else:
+                st.error(f"❌ Status {test_resp.status_code}")
+        except Exception as e:
+            st.error(f"❌ Failed: {str(e)[:50]}...")
+            st.info("Check BACKEND_URL in Streamlit Secrets.")
+
+st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+
 # Main Dashboard Layout
 c1, c2 = st.columns([2.5, 1])
 
