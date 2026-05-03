@@ -18,7 +18,8 @@ from src.frontend.api import BASE_URL
 
 # Pre-warm the backend (wake up Hugging Face space)
 try:
-    requests.get(f"{BASE_URL}/", timeout=1)
+    # Increased timeout to 15s to allow for cold starts on Hugging Face
+    requests.get(f"{BASE_URL}/", timeout=15)
 except:
     pass
 import smtplib
@@ -274,9 +275,12 @@ class VideoProcessor(VideoProcessorBase):
             _, buffer = cv2.imencode(".jpg", small_frame)
             
             res = upload_frame(buffer.tobytes(), zone_name=self.zone_name, max_capacity=self.max_capacity)
-            if res:
+            if res and "error" not in res:
                 self.tracks = res.get('tracks', [])
                 self.count = res.get('count', len(self.tracks))
+            elif res and "error" in res:
+                # Silently fail for WebRTC to avoid UI spam, but could log to console
+                pass
 
         # Draw bounding boxes
         for t in self.tracks:
@@ -299,16 +303,31 @@ with st.sidebar.expander("AI Backend Diagnostics", expanded=False):
     st.write(f"**Target API:**")
     st.code(BASE_URL)
     if st.button("Test AI Connection"):
-        try:
-            import requests
-            test_resp = requests.get(f"{BASE_URL}/", timeout=5)
-            if test_resp.status_code == 200:
-                st.success(f"✅ Connected: {test_resp.json().get('status')}")
-            else:
-                st.error(f"❌ Status {test_resp.status_code}")
-        except Exception as e:
-            st.error(f"❌ Failed: {str(e)[:50]}...")
-            st.info("Check BACKEND_URL in Streamlit Secrets.")
+        with st.spinner("Checking backend connectivity..."):
+            try:
+                import requests
+                import socket
+                from urllib.parse import urlparse
+                
+                # 1. Check DNS resolution
+                parsed_url = urlparse(BASE_URL)
+                hostname = parsed_url.hostname
+                try:
+                    ip = socket.gethostbyname(hostname)
+                    st.info(f"🌐 DNS: {hostname} resolved to {ip}")
+                except Exception as e:
+                    st.error(f"🌐 DNS Error: Could not resolve {hostname}. Check for typos in BACKEND_URL.")
+                
+                # 2. Check HTTP Connectivity
+                test_resp = requests.get(f"{BASE_URL}/", timeout=10)
+                if test_resp.status_code == 200:
+                    st.success(f"✅ Connected: {test_resp.json().get('status')}")
+                else:
+                    st.error(f"❌ Status {test_resp.status_code}: {test_resp.text[:100]}")
+            except Exception as e:
+                st.error(f"❌ Connection Failed")
+                st.exception(e) # Show full traceback for debugging
+                st.info("Check BACKEND_URL in Streamlit Secrets. Ensure it starts with https://")
 
 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 
@@ -401,7 +420,8 @@ def get_zone_forecast(history):
     if not history: return None
     import requests
     try:
-        r = requests.post("http://127.0.0.1:8000/predict-zone", json={"periods": 15, "history_counts": history[-100:]})
+        # Fixed: Use BASE_URL instead of hardcoded localhost
+        r = requests.post(f"{BASE_URL}/predict-zone", json={"periods": 15, "history_counts": history[-100:]}, timeout=5)
         return r.json()
     except Exception:
         return None
@@ -630,7 +650,7 @@ if st.session_state.get('running', False) and input_source != "None":
                     res = upload_frame(buffer.tobytes(), zone_name=zones[i], max_capacity=user_caps[i])
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     
-                    if res:
+                    if res and "error" not in res:
                         tracks = res.get('tracks', [])
                         zone_counts[i] = res.get('count', len(tracks))
                         st.session_state[f"last_count_{i}"] = zone_counts[i]
@@ -638,6 +658,9 @@ if st.session_state.get('running', False) and input_source != "None":
                         for t in tracks:
                             x1, y1, x2, y2 = t['bbox']
                             cv2.rectangle(frame_rgb, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                    elif res and "error" in res:
+                        cv2.putText(frame_rgb, f"API Error: {res.get('error')}", (10, 30), 
+                                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
                             
                     add_footer(frame_rgb, f"{zones[i]} - {zone_counts[i]} detected")
                     frames[i] = frame_rgb

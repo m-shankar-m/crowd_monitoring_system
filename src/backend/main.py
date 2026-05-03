@@ -19,6 +19,10 @@ app.add_middleware(
 def read_root():
     return {"status": "alive", "service": "Crowd Monitoring API"}
 
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
 @app.post("/live-density")
 async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown", max_capacity: int = 25):
     try:

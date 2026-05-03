@@ -8,10 +8,13 @@ def upload_frame(file_bytes, zone_name=None, max_capacity=25):
     try:
         files = {"file": ("frame.jpg", file_bytes, "image/jpeg")}
         params = {"zone_name": zone_name, "max_capacity": max_capacity}
-        resp = requests.post(f"{BASE_URL}/live-density", files=files, params=params, timeout=2)
-        return resp.json() if resp.status_code == 200 else None
-    except:
-        return None
+        # Increased timeout to 10s for slow CPU-based inference on Hugging Face
+        resp = requests.post(f"{BASE_URL}/live-density", files=files, params=params, timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+        return {"error": f"Status {resp.status_code}", "detail": resp.text[:100]}
+    except Exception as e:
+        return {"error": "Connection Failed", "detail": str(e)[:100]}
 
 def train_model():
     try:
