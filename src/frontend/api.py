@@ -2,7 +2,7 @@ import requests
 
 import os
 
-BASE_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+BASE_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000").strip().rstrip("/")
 
 def upload_frame(file_bytes, zone_name=None, max_capacity=25):
     try:
