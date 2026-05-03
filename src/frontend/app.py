@@ -549,9 +549,9 @@ elif input_source == "Live Camera":
             # Show the WebRTC component in the sidebar for this zone
             webrtc_streamer(
                 key=f"webrtc_{i}",
-                mode=WebRtcMode.SENDRECV,
+                mode=WebRtcMode.SENDONLY, # Capture only
                 rtc_configuration=RTC_CONFIG,
-                video_frame_callback=get_webrtc_callback(i), # Unique callback per zone
+                video_frame_callback=get_webrtc_callback(i),
                 media_stream_constraints={"video": True, "audio": False},
                 async_processing=True,
             )
@@ -584,12 +584,21 @@ elif input_source == "Live Camera":
                 except Exception:
                     pass
                 
-    # Developer Debug Info
-    if DEBUG_INFO["error"]:
-        with st.sidebar.expander("🛠️ Developer Debug", expanded=True):
-            st.error(DEBUG_INFO["error"])
-            st.write(f"Last Call: {DEBUG_INFO['last_call']}")
-            st.button("Clear Error", on_click=lambda: DEBUG_INFO.update({"error": None}))
+    # System Status & Debug Info
+    with st.sidebar.expander("📊 System Status", expanded=True):
+        status_col1, status_col2 = st.columns(2)
+        status_col1.metric("Status", "RUNNING" if st.session_state.get('running') else "STOPPED")
+        status_col2.metric("Cameras", sum(1 for c in caps if c is not None))
+        
+        if DEBUG_INFO["error"]:
+            st.error(f"⚠️ {DEBUG_INFO['error']}")
+        else:
+            st.success("✅ Backend Engine: OK")
+            
+        if DEBUG_INFO["last_call"]:
+            st.caption(f"Last frame processed: {DEBUG_INFO['last_call']}")
+        else:
+            st.caption("Waiting for first frame...")
     
     if len(st.session_state.camera_configs) < 4:
         if st.sidebar.button("➕ Add Another Camera"):
@@ -627,9 +636,9 @@ if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophe
             st.sidebar.error(f"Training failed: {result.get('message') if result else 'Server error'}")
 
 col1, col2 = st.sidebar.columns(2)
-if col1.button("Start Processing"):
+if col1.button("▶️ Start Processing", type="primary", use_container_width=True):
     st.session_state.running = True
-if col2.button("Stop"):
+if col2.button("⏹️ Stop", use_container_width=True):
     st.session_state.running = False
 
 if st.session_state.get('running', False) and input_source != "None":
