@@ -530,6 +530,20 @@ if st.session_state.get('running', False) and input_source != "None":
     def add_footer(img, text):
         cv2.putText(img, text, (10, img.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 255, 200), 2)
         
+    # Initialize WebRTC contexts if selected
+    webrtc_ctxs = {}
+    for i in range(4):
+        if i < len(st.session_state.camera_configs) and st.session_state.camera_configs[i]["value"] == "WEBRTC":
+            with ph_vids[i].container():
+                ctx = webrtc_streamer(
+                    key=f"webrtc-{i}",
+                    mode=WebRtcMode.SENDRECV,
+                    rtc_configuration=RTC_CONFIGURATION,
+                    video_processor_factory=VideoProcessor,
+                    media_stream_constraints={"video": True, "audio": False},
+                    async_processing=True,
+                )
+                webrtc_ctxs[i] = ctx
     while True:
         zone_counts = [0, 0, 0, 0]
         frames = [None, None, None, None]
@@ -562,28 +576,15 @@ if st.session_state.get('running', False) and input_source != "None":
                             
                     add_footer(frame_rgb, f"{zones[i]} - {zone_counts[i]} detected")
                     frames[i] = frame_rgb
-            elif i < len(st.session_state.camera_configs) and st.session_state.camera_configs[i]["value"] == "WEBRTC":
+            elif i in webrtc_ctxs:
                 active_caps += 1
-                frames[i] = "WEBRTC_ACTIVE"
-                if f"webrtc_ctx_{i}" in st.session_state and st.session_state[f"webrtc_ctx_{i}"].video_processor:
-                    zone_counts[i] = st.session_state[f"webrtc_ctx_{i}"].video_processor.count
+                if webrtc_ctxs[i].video_processor:
+                    zone_counts[i] = webrtc_ctxs[i].video_processor.count
                     
         # Update layout images
         for i in range(4):
-            if isinstance(frames[i], str) and frames[i] == "WEBRTC_ACTIVE":
-                with ph_vids[i].container():
-                    ctx = webrtc_streamer(
-                        key=f"webrtc-{i}-{time.time() // 3600}", # Refresh key every hour
-                        mode=WebRtcMode.SENDRECV,
-                        rtc_configuration=RTC_CONFIGURATION,
-                        video_processor_factory=VideoProcessor,
-                        media_stream_constraints={"video": True, "audio": False},
-                        async_processing=True,
-                    )
-                    if ctx.video_processor:
-                        ctx.video_processor.zone_name = zones[i]
-                        ctx.video_processor.max_capacity = user_caps[i]
-                    st.session_state[f"webrtc_ctx_{i}"] = ctx
+            if i in webrtc_ctxs:
+                continue
             elif frames[i] is not None:
                 ph_vids[i].image(frames[i], use_container_width=True)
             else:
