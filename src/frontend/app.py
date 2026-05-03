@@ -212,7 +212,7 @@ class VideoProcessor(VideoProcessorBase):
             res = upload_frame(buffer.tobytes(), zone_name=self.zone_name, max_capacity=self.max_capacity)
             if res:
                 self.tracks = res.get('tracks', [])
-                self.count = len(self.tracks)
+                self.count = res.get('count', len(self.tracks))
 
         # Draw bounding boxes
         for t in self.tracks:
@@ -534,7 +534,7 @@ if st.session_state.get('running', False) and input_source != "None":
                     
                     if res:
                         tracks = res.get('tracks', [])
-                        zone_counts[i] = len(tracks)
+                        zone_counts[i] = res.get('count', len(tracks))
                         
                         for t in tracks:
                             x1, y1, x2, y2 = t['bbox']
