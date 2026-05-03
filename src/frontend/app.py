@@ -622,14 +622,6 @@ if st.session_state.get('running', False) and input_source != "None":
                 if not ret:
                     caps[i].release()
                     caps[i] = None
-                # Speed optimization: Process every 3rd frame only
-                if frame_counter % 3 != 0:
-                    frame_small = cv2.resize(frame, (480, 270))
-                    frames[i] = cv2.cvtColor(frame_small, cv2.COLOR_BGR2RGB)
-                    # use last known count
-                    zone_counts[i] = st.session_state.get(f"last_count_{i}", 0)
-                    continue
-
                 # Downscale individual feeds to maintain overall UI performance
                 frame = cv2.resize(frame, (480, 270))
                 is_success, buffer = cv2.imencode(".jpg", frame)
