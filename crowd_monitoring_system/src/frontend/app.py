@@ -299,12 +299,17 @@ class VideoProcessor(VideoProcessorBase):
 
         # Draw bounding boxes
         for t in self.tracks:
-            x1, y1, x2, y2 = t['bbox']
-            # Scale coordinates back to original frame size
-            h, w = img.shape[:2]
-            sx1, sy1 = int(x1 * w / 480), int(y1 * h / 270)
-            sx2, sy2 = int(x2 * w / 480), int(y2 * h / 270)
-            cv2.rectangle(img, (sx1, sy1), (sx2, sy2), (0, 255, 0), 2)
+            try:
+                bbox = t.get('bbox', [])
+                if len(bbox) == 4:
+                    x1, y1, x2, y2 = bbox
+                    # Scale coordinates back to original frame size
+                    h, w = img.shape[:2]
+                    sx1, sy1 = int(x1 * w / 480), int(y1 * h / 270)
+                    sx2, sy2 = int(x2 * w / 480), int(y2 * h / 270)
+                    cv2.rectangle(img, (sx1, sy1), (sx2, sy2), (0, 255, 0), 2)
+            except Exception:
+                continue
             
         cv2.putText(img, f"{self.zone_name} - {self.count} detected", (20, 50), 
                     cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
@@ -691,8 +696,13 @@ if st.session_state.get('running', False) and input_source != "None":
                     st.session_state[f"last_count_{i}"] = zone_counts[i]
                     
                     for t in tracks:
-                        x1, y1, x2, y2 = t['bbox']
-                        cv2.rectangle(frame_rgb, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                        try:
+                            bbox = t.get('bbox', [])
+                            if len(bbox) == 4:
+                                x1, y1, x2, y2 = bbox
+                                cv2.rectangle(frame_rgb, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                        except Exception:
+                            continue
                             
                     add_footer(frame_rgb, f"{zones[i]} - {zone_counts[i]} detected")
                     frames[i] = frame_rgb
