@@ -10,11 +10,10 @@ import numpy as np
 import requests
 import plotly.graph_objects as go
 import pandas as pd
-from src.frontend.api import upload_frame, get_forecast, train_model, update_email_settings
+import gc
+from src.frontend.api import upload_frame, get_forecast, train_model, update_email_settings, BASE_URL
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode, RTCConfiguration
 import av
-import requests
-from src.frontend.api import BASE_URL
 
 # Pre-warm the backend (wake up Hugging Face space)
 try:
@@ -606,6 +605,15 @@ if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophe
         else:
             st.sidebar.error(f"Training failed: {result.get('message') if result else 'Server error'}")
 
+st.sidebar.markdown("### 🧹 System Maintenance")
+if st.sidebar.button("Clear System Memory", help="Manually triggers garbage collection and clears Streamlit caches"):
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    gc.collect()
+    st.sidebar.success("Memory & Cache cleared!")
+    time.sleep(1)
+    st.rerun()
+
 col1, col2 = st.sidebar.columns(2)
 if col1.button("Start Processing"):
     st.session_state.running = True
@@ -647,6 +655,7 @@ if st.session_state.get('running', False) and input_source != "None":
                 if not ret:
                     caps[i].release()
                     caps[i] = None
+                    continue
                 # Downscale individual feeds to maintain overall UI performance
                 frame = cv2.resize(frame, (480, 270))
                 is_success, buffer = cv2.imencode(".jpg", frame)
@@ -679,7 +688,7 @@ if st.session_state.get('running', False) and input_source != "None":
                 if webrtc_ctxs[i].video_processor:
                     zone_counts[i] = webrtc_ctxs[i].video_processor.count
                     
-        # Update layout images
+        # Update layout images (Always update video for smoothness)
         for i in range(4):
             if i in webrtc_ctxs:
                 continue
@@ -697,39 +706,39 @@ if st.session_state.get('running', False) and input_source != "None":
             time.sleep(1)
             break
             
-        # Update histories (ensure all have same length for DataFrame)
-        if 'histories' not in st.session_state:
-            st.session_state.histories = [[], [], [], []]
-            
-        for i in range(4):
-            # Always append to keep lengths synced for the graph
-            val = zone_counts[i] if frames[i] is not None or i in webrtc_ctxs else 0
-            st.session_state.histories[i].append(val)
-            if len(st.session_state.histories[i]) > 300:
-                st.session_state.histories[i].pop(0)
+        # --- HEAVY UI UPDATES (Only every 4 frames / ~1 second) ---
+        if frame_counter % 4 == 0:
+            # Update histories
+            if 'histories' not in st.session_state:
+                st.session_state.histories = [[], [], [], []]
                 
-        # Update graph
-        import pandas as pd
-        # Only update if we have at least 2 points to draw
-        if len(st.session_state.histories[0]) > 1:
-            try:
-                graph_data = pd.DataFrame({
-                    'Time': range(len(st.session_state.histories[0])),
-                    'Zone A': st.session_state.histories[0],
-                    'Zone B': st.session_state.histories[1],
-                    'Zone C': st.session_state.histories[2],
-                    'Zone D': st.session_state.histories[3],
-                })
-                graph_ph.line_chart(graph_data.set_index('Time'), use_container_width=True)
-            except Exception:
-                pass
-        
-        alerts = update_alert_feed(zone_counts, user_caps)
-        update_kpis(sum(zone_counts), last_total, alerts)
-        update_zone_snapshots(zone_counts, user_caps)
-        
-        if frame_counter % 15 == 0:
+            for i in range(4):
+                val = zone_counts[i] if frames[i] is not None or i in webrtc_ctxs else 0
+                st.session_state.histories[i].append(val)
+                if len(st.session_state.histories[i]) > 300:
+                    st.session_state.histories[i].pop(0)
+                    
+            # Update graph
+            if len(st.session_state.histories[0]) > 1:
+                try:
+                    graph_data = pd.DataFrame({
+                        'Time': range(len(st.session_state.histories[0])),
+                        'Zone A': st.session_state.histories[0],
+                        'Zone B': st.session_state.histories[1],
+                        'Zone C': st.session_state.histories[2],
+                        'Zone D': st.session_state.histories[3],
+                    })
+                    graph_ph.line_chart(graph_data.set_index('Time'), use_container_width=True)
+                except Exception:
+                    pass
+            
+            alerts = update_alert_feed(zone_counts, user_caps)
+            update_kpis(sum(zone_counts), last_total, alerts)
+            update_zone_snapshots(zone_counts, user_caps)
             last_total = sum(zone_counts)
             
+            # EXPLICIT RAM CLEANING
+            gc.collect()
+
         frame_counter += 1
-        time.sleep(0.05)
+        time.sleep(0.2) # Throttle to ~5 FPS for memory stability
