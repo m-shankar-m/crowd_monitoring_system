@@ -563,23 +563,6 @@ with st.sidebar.expander("Email Settings", expanded=False):
             os.environ["ALERT_EMAIL_PASSWORD"] = e_pass
         else:
             st.error("Failed to update.")
-            
-    if st.button("📧 Send Test Email"):
-        with st.spinner("Sending test alert..."):
-            try:
-                test_url = f"{BASE_URL}/test-email-alert"
-                resp = requests.get(test_url, params={"count": 100, "zone_name": "Diagnostic Test", "max_capacity": 50}, timeout=10)
-                if resp.status_code == 200:
-                    res_data = resp.json()
-                    email_res = res_data.get("email", {})
-                    if email_res.get("sent"):
-                        st.success("✅ Test email sent! Check your inbox.")
-                    else:
-                        st.error(f"❌ Backend error: {email_res.get('reason')}")
-                else:
-                    st.error(f"❌ Backend returned status {resp.status_code}")
-            except Exception as e:
-                st.error(f"❌ Connection error: {str(e)[:50]}...")
 
 st.sidebar.markdown("### 🧠 Model Management")
 if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophet on latest data"):
