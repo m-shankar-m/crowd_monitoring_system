@@ -1,9 +1,23 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from src.backend.services.density import process_image
 from src.backend.services.forecast import train_system, get_predictions, get_predictive_risk
 from src.risk.alert import generate_alert
 
 app = FastAPI(title="Crowd_Predictor_Framework API")
+
+# Enable CORS for all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"status": "alive", "service": "Crowd Monitoring API"}
 
 @app.post("/live-density")
 async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown", max_capacity: int = 25):

@@ -244,9 +244,9 @@ with st.sidebar.expander("AI Backend Diagnostics", expanded=False):
     if st.button("Test AI Connection"):
         try:
             import requests
-            test_resp = requests.get(f"{BASE_URL}/docs", timeout=5)
+            test_resp = requests.get(f"{BASE_URL}/", timeout=5)
             if test_resp.status_code == 200:
-                st.success("✅ Connected to AI Engine")
+                st.success(f"✅ Connected: {test_resp.json().get('status')}")
             else:
                 st.error(f"❌ Status {test_resp.status_code}")
         except Exception as e:
