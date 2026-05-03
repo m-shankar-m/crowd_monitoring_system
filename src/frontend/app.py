@@ -419,15 +419,15 @@ if input_source == "Upload Video":
                 st.session_state[cache_key] = uploaded_file.size
                 
             caps[i] = cv2.VideoCapture(temp_path)
-elif input_source == "Live Camera":
-    if 'camera_configs' not in st.session_state:
-        st.session_state.camera_configs = [
-            {"type": "System Camera (Laptop)", "value": "0"},
-            {"type": "System Camera (Laptop)", "value": "0"},
-            {"type": "System Camera (Laptop)", "value": "0"},
-            {"type": "System Camera (Laptop)", "value": "0"}
-        ]
+if 'camera_configs' not in st.session_state:
+    st.session_state.camera_configs = [
+        {"type": "System Camera (Laptop)", "value": "0"},
+        {"type": "System Camera (Laptop)", "value": "0"},
+        {"type": "System Camera (Laptop)", "value": "0"},
+        {"type": "System Camera (Laptop)", "value": "0"}
+    ]
 
+elif input_source == "Live Camera":
     for i in range(len(st.session_state.camera_configs)):
         if i < 4:
             st.sidebar.markdown(f"**{zones[i]} Feed Configuration**")
