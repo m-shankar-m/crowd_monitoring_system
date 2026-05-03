@@ -426,6 +426,12 @@ elif input_source == "Live Camera":
     for i in range(len(st.session_state.camera_configs)):
         if i < 4:
             st.sidebar.markdown(f"**{zones[i]} Feed Configuration**")
+            options = ["System Camera (Laptop)", "USB Camera (Cable)", "CCTV Camera (Online/IP)"]
+            
+            # Ensure safe indexing
+            current_type = st.session_state.camera_configs[i]["type"]
+            idx = options.index(current_type) if current_type in options else 0
+            
             cam_type = st.sidebar.selectbox(f"Camera Type", options + ["Webcam (Cloud/Browser)"], index=idx, key=f"cam_type_{i}")
             st.session_state.camera_configs[i]["type"] = cam_type
             
