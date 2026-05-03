@@ -13,8 +13,57 @@ import pandas as pd
 from src.frontend.api import upload_frame, get_forecast, train_model, update_email_settings
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode, RTCConfiguration
 import av
+import smtplib
+import ssl
+from email.message import EmailMessage
 
 st.set_page_config(page_title="Crowd_Predictor_Framework", layout="wide", initial_sidebar_state="collapsed")
+
+# Frontend Email Alert Logic
+def send_frontend_alert(zone_name, count, max_capacity):
+    """Sends an email alert directly from Streamlit."""
+    email_to = os.getenv("ALERT_EMAIL_TO")
+    email_from = os.getenv("ALERT_EMAIL_FROM")
+    email_password = os.getenv("ALERT_EMAIL_PASSWORD")
+    
+    if not all([email_to, email_from, email_password]):
+        return False, "Credentials missing in Secrets"
+
+    # Cooldown check
+    cooldown = 60
+    now = time.time()
+    last_alert = st.session_state.get(f"last_alert_{zone_name}", 0)
+    if now - last_alert < cooldown:
+        return False, "Cooldown active"
+
+    try:
+        subject = f"🚨 HIGH CROWD ALERT: {zone_name}"
+        body = f"""
+        Critical crowd density detected!
+        
+        Zone: {zone_name}
+        Current Count: {count}
+        Max Capacity: {max_capacity}
+        Occupancy: {int((count/max_capacity)*100)}%
+        
+        Time: {time.strftime('%Y-%m-%d %H:%M:%S')}
+        """
+        
+        msg = EmailMessage()
+        msg.set_content(body)
+        msg["Subject"] = subject
+        msg["From"] = email_from
+        msg["To"] = email_to
+
+        context = ssl.create_default_context()
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+            server.login(email_from, email_password)
+            server.send_message(msg)
+            
+        st.session_state[f"last_alert_{zone_name}"] = now
+        return True, "Sent"
+    except Exception as e:
+        return False, str(e)
 
 # Inject Custom CSS
 st.markdown("""
@@ -319,6 +368,8 @@ def update_alert_feed(counts, caps):
             </div>
             """
             alerts_triggered += 1
+            # Send real-time email alert from frontend
+            send_frontend_alert(names[i], counts[i], caps[i])
         elif pct > 50:
             html += f"""
             <div class="alert-obj" style="background-color: #fff9c4; border-left-color: #fbc02d;">
