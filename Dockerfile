@@ -24,6 +24,9 @@ WORKDIR /app/crowd_monitoring_system
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download YOLO weights to avoid download delay at startup
+RUN python3 -c "from ultralytics import YOLO; YOLO('yolov8n.pt')"
+
 # Ensure directories exist for YOLO weights and logs
 RUN mkdir -p logs data/models data/temp_videos
 
