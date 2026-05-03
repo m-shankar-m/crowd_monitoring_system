@@ -549,7 +549,7 @@ elif input_source == "Live Camera":
             # Show the WebRTC component in the sidebar for this zone
             webrtc_streamer(
                 key=f"webrtc_{i}",
-                mode=WebRtcMode.SENDONLY, # Capture only
+                mode=WebRtcMode.SENDRECV,
                 rtc_configuration=RTC_CONFIG,
                 video_frame_callback=get_webrtc_callback(i),
                 media_stream_constraints={"video": True, "audio": False},
@@ -583,28 +583,17 @@ elif input_source == "Live Camera":
                         caps[i] = cv2.VideoCapture(val.strip())
                 except Exception:
                     pass
-                
-    # System Status & Debug Info
-    with st.sidebar.expander("📊 System Status", expanded=True):
-        status_col1, status_col2 = st.columns(2)
-        status_col1.metric("Status", "RUNNING" if st.session_state.get('running') else "STOPPED")
-        status_col2.metric("Cameras", sum(1 for c in caps if c is not None))
         
-        if DEBUG_INFO["error"]:
-            st.error(f"⚠️ {DEBUG_INFO['error']}")
-        else:
-            st.success("✅ Backend Engine: OK")
-            
-        if DEBUG_INFO["last_call"]:
-            st.caption(f"Last frame processed: {DEBUG_INFO['last_call']}")
-        else:
-            st.caption("Waiting for first frame...")
+    # Developer Info (Simple)
+    if DEBUG_INFO["error"]:
+        st.sidebar.error(f"Engine Error: {DEBUG_INFO['error']}")
     
     if len(st.session_state.camera_configs) < 4:
         if st.sidebar.button("➕ Add Another Camera"):
             st.session_state.camera_configs.append({"type": "System Camera (Laptop)", "value": ""})
             st.experimental_rerun()
 
+st.sidebar.markdown("---")
 st.sidebar.markdown("### 📧 Alert System Configuration")
 with st.sidebar.expander("Email Settings"):
     default_to = _get_cred("ALERT_EMAIL_TO")
@@ -635,10 +624,9 @@ if st.sidebar.button("Retrain Models", help="Re-syncs and trains LSTM and Prophe
         else:
             st.sidebar.error(f"Training failed: {result.get('message') if result else 'Server error'}")
 
-col1, col2 = st.sidebar.columns(2)
-if col1.button("▶️ Start Processing", type="primary", use_container_width=True):
+if st.sidebar.button("▶️ START ANALYSIS", use_container_width=True, type="primary"):
     st.session_state.running = True
-if col2.button("⏹️ Stop", use_container_width=True):
+if st.sidebar.button("⏹️ STOP", use_container_width=True):
     st.session_state.running = False
 
 if st.session_state.get('running', False) and input_source != "None":
