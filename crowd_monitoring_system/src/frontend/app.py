@@ -608,23 +608,39 @@ if st.session_state.get('running', False) and input_source != "None":
             time.sleep(1)
             break
             
+        # Update histories (ensure all have same length for DataFrame)
         if 'histories' not in st.session_state:
             st.session_state.histories = [[], [], [], []]
             
-        current_total = sum(zone_counts)
         for i in range(4):
-            if frames[i] is not None:
-                st.session_state.histories[i].append(zone_counts[i])
-                if len(st.session_state.histories[i]) > 300:
-                    st.session_state.histories[i].pop(0)
+            # Always append to keep lengths synced for the graph
+            val = zone_counts[i] if frames[i] is not None else 0
+            st.session_state.histories[i].append(val)
+            if len(st.session_state.histories[i]) > 300:
+                st.session_state.histories[i].pop(0)
                 
+        # Update graph
+        import pandas as pd
+        # Only update if we have at least 2 points to draw
+        if len(st.session_state.histories[0]) > 1:
+            try:
+                graph_data = pd.DataFrame({
+                    'Time': range(len(st.session_state.histories[0])),
+                    'Zone A': st.session_state.histories[0],
+                    'Zone B': st.session_state.histories[1],
+                    'Zone C': st.session_state.histories[2],
+                    'Zone D': st.session_state.histories[3],
+                })
+                graph_ph.line_chart(graph_data.set_index('Time'), use_container_width=True)
+            except Exception:
+                pass
+            
         alerts = update_alert_feed(zone_counts, user_caps)
-        update_kpis(current_total, last_total, alerts)
+        update_kpis(sum(zone_counts), last_total, alerts)
         update_zone_snapshots(zone_counts, user_caps)
         
         if frame_counter % 15 == 0:
-            last_total = current_total
-            render_graphs(st.session_state.histories)
+            last_total = sum(zone_counts)
             
         frame_counter += 1
         time.sleep(0.05)
