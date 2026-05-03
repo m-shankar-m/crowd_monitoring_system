@@ -22,15 +22,20 @@ st.session_state.backend_started = True
 import threading
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 
-# --- WebRTC Shared State ---
-lock = threading.Lock()
-webrtc_frames = {} # Store frames per zone index
+# --- WebRTC Session State ---
+if "webrtc_frames" not in st.session_state:
+    st.session_state.webrtc_frames = {}
+if "webrtc_lock" not in st.session_state:
+    st.session_state.webrtc_lock = threading.Lock()
+if "webrtc_count" not in st.session_state:
+    st.session_state.webrtc_count = 0
 
 def get_webrtc_callback(zone_idx):
     def callback(frame):
         img = frame.to_ndarray(format="bgr24")
-        with lock:
-            webrtc_frames[zone_idx] = img
+        with st.session_state.webrtc_lock:
+            st.session_state.webrtc_frames[zone_idx] = img
+            st.session_state.webrtc_count += 1
         return frame
     return callback
 
@@ -591,10 +596,7 @@ elif input_source == "Live Camera":
     if DEBUG_INFO["error"]:
         st.sidebar.error(f"Engine Error: {DEBUG_INFO['error']}")
     
-    if len(st.session_state.camera_configs) < 4:
-        if st.sidebar.button("➕ Add Another Camera"):
-            st.session_state.camera_configs.append({"type": "System Camera (Laptop)", "value": ""})
-            st.experimental_rerun()
+    st.sidebar.caption(f"Network Sync: {st.session_state.webrtc_count} frames received")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 📧 Alert System Configuration")
@@ -653,9 +655,9 @@ if st.session_state.get('running', False) and input_source != "None":
             frame = None
             if caps[i] == "webrtc":
                 active_caps += 1
-                with lock:
-                    if i in webrtc_frames:
-                        frame = webrtc_frames[i].copy()
+                with st.session_state.webrtc_lock:
+                    if i in st.session_state.webrtc_frames:
+                        frame = st.session_state.webrtc_frames[i].copy()
                 
                 if frame is None:
                     # Small sleep to allow frame arrival
