@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 import streamlit as st
 import cv2
 import numpy as np
+import requests
 import plotly.graph_objects as go
 import pandas as pd
 from src.frontend.api import upload_frame, get_forecast, train_model, update_email_settings
