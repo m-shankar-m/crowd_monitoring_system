@@ -543,12 +543,10 @@ if st.session_state.get('running', False) and input_source != "None":
                     add_footer(frame_rgb, f"{zones[i]} - {zone_counts[i]} detected")
                     frames[i] = frame_rgb
             elif i < len(st.session_state.camera_configs) and st.session_state.camera_configs[i]["value"] == "WEBRTC":
-                # WebRTC feeds are handled by the streamer component, but we need to track counts
                 active_caps += 1
+                frames[i] = "WEBRTC_ACTIVE"
                 if f"webrtc_ctx_{i}" in st.session_state and st.session_state[f"webrtc_ctx_{i}"].video_processor:
                     zone_counts[i] = st.session_state[f"webrtc_ctx_{i}"].video_processor.count
-                    # Force a non-None frame placeholder so the loop doesn't show "No input"
-                    frames[i] = "WEBRTC_ACTIVE"
                     
         # Update layout images
         for i in range(4):
