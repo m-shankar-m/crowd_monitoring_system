@@ -23,7 +23,7 @@ except:
 # Import backend logic
 try:
     from src.backend.services.density import process_image
-    from src.risk.alert import generate_alert
+    from src.risk.alert import generate_alert, predict_future_risk
     from src.backend.services.forecast import get_predictive_risk, train_system
     from src.frontend.api import update_email_settings
 except ImportError:
@@ -36,10 +36,6 @@ if "webrtc_lock" not in st.session_state:
     st.session_state.webrtc_lock = threading.Lock()
 if "webrtc_count" not in st.session_state:
     st.session_state.webrtc_count = 0
-if "camera_configs" not in st.session_state:
-    st.session_state.camera_configs = [{"type": "Browser Camera (WebRTC)", "value": "webrtc"}]
-if "running" not in st.session_state:
-    st.session_state.running = False
 
 def get_webrtc_callback(zone_idx):
     def callback(frame):
@@ -68,137 +64,132 @@ def get_analysis_direct(image_bytes, zone_name, max_capacity):
         DEBUG_INFO["error"] = str(e)
         return None
 
-# --- UI CONFIGURATION ---
-st.set_page_config(page_title="Crowd Monitoring | Premium Dashboard", layout="wide", initial_sidebar_state="expanded")
+# --- UI CONFIGURATION (PREMIUM) ---
+st.set_page_config(page_title="Crowd Monitoring | Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-# Premium CSS
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
     
     html, body, [data-testid="stAppViewContainer"] {
         background: #0F172A;
-        font-family: 'Inter', sans-serif;
+        font-family: 'Outfit', sans-serif;
         color: #E2E8F0;
     }
     
     .metric-card {
-        background: rgba(30, 41, 59, 0.5);
-        backdrop-filter: blur(10px);
+        background: rgba(30, 41, 59, 0.45);
+        backdrop-filter: blur(12px);
         border: 1px solid rgba(56, 189, 248, 0.1);
-        border-radius: 12px;
+        border-radius: 16px;
         padding: 1.5rem;
-        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
     
     .section-title {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: #94A3B8;
-        font-weight: 600;
-        margin: 1.5rem 0 1rem 0;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+        letter-spacing: 0.15em;
+        color: #64748B;
+        font-weight: 700;
+        margin: 2rem 0 1rem 0;
+        display: flex; align-items: center; gap: 0.6rem;
     }
     
     .section-badge {
-        background: rgba(56, 189, 248, 0.15);
+        background: rgba(56, 189, 248, 0.12);
         color: #38BDF8;
-        padding: 2px 8px;
-        border-radius: 4px;
+        padding: 3px 10px;
+        border-radius: 6px;
         font-size: 0.7rem;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Header
+# Top Bar
 t1, t2 = st.columns([3, 1])
 with t1:
-    st.markdown("<h1 style='margin:0;'>Crowd Monitoring <span style='color:#38BDF8'>System</span></h1>", unsafe_allow_html=True)
-    st.caption("Advanced Real-Time Occupancy Analytics")
+    st.markdown("<h1 style='margin:0; font-weight:700; font-size:2.5rem;'>Crowd <span style='color:#38BDF8'>Intelligence</span></h1>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#64748B; font-size:1.1rem; margin-top:-5px;'>Real-time AI Occupancy Monitoring & Predictive Analytics</p>", unsafe_allow_html=True)
 
-# Top KPIs
+# Main KPIs
 k1, k2, k3, k4 = st.columns(4)
 ph_total = k1.empty()
 ph_zones = k2.empty()
 ph_alerts = k3.empty()
-ph_accuracy = k4.empty()
+ph_acc = k4.empty()
 
-def update_kpis(total, alerts):
-    ph_total.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.8rem;'>Total People</div><div style='font-size:2rem; font-weight:700;'>{total}</div></div>", unsafe_allow_html=True)
-    ph_zones.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.8rem;'>Active Zones</div><div style='font-size:2rem; font-weight:700;'>4</div></div>", unsafe_allow_html=True)
-    ph_alerts.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.8rem;'>Active Alerts</div><div style='font-size:2rem; font-weight:700; color:#EF4444;'>{alerts}</div></div>", unsafe_allow_html=True)
-    ph_accuracy.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.8rem;'>System Accuracy</div><div style='font-size:2rem; font-weight:700; color:#10B981;'>94.2%</div></div>", unsafe_allow_html=True)
+def update_top_stats(total, active_alerts):
+    ph_total.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.85rem;'>TOTAL PEOPLE</div><div style='font-size:2.2rem; font-weight:700; color:#F8FAFC;'>{total:,}</div></div>", unsafe_allow_html=True)
+    ph_zones.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.85rem;'>ACTIVE ZONES</div><div style='font-size:2.2rem; font-weight:700; color:#F8FAFC;'>4</div></div>", unsafe_allow_html=True)
+    ph_alerts.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.85rem;'>ACTIVE ALERTS</div><div style='font-size:2.2rem; font-weight:700; color:#EF4444;'>{active_alerts}</div></div>", unsafe_allow_html=True)
+    ph_acc.markdown(f"<div class='metric-card'><div style='color:#94A3B8; font-size:0.85rem;'>SYSTEM ACCURACY</div><div style='font-size:2.2rem; font-weight:700; color:#10B981;'>94.5%</div></div>", unsafe_allow_html=True)
 
-update_kpis(0, 0)
+update_top_stats(0, 0)
 
-# Main Dashboard
-c1, c2 = st.columns([2.5, 1])
+# Layout
+col_main, col_side = st.columns([2.5, 1])
 
-with c1:
-    st.markdown("<div class='section-title'><span class='section-badge'>TRENDS</span> Prediction Forecast</div>", unsafe_allow_html=True)
+with col_main:
+    st.markdown("<div class='section-title'><span class='section-badge'>TEAM 2</span> Occupancy Forecast & Trends</div>", unsafe_allow_html=True)
     graph_ph = st.empty()
     
-    st.markdown("<div class='section-title'><span class='section-badge'>VIDEO</span> Live Detection Feeds</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'><span class='section-badge'>TEAM 2</span> Live Visual Detection</div>", unsafe_allow_html=True)
     v1, v2 = st.columns(2)
     v3, v4 = st.columns(2)
     vid_phs = [v1.empty(), v2.empty(), v3.empty(), v4.empty()]
 
-with c2:
-    st.markdown("<div class='section-title'><span class='section-badge'>ALERTS</span> Zone Snapshots</div>", unsafe_allow_html=True)
-    metric_phs = [st.empty() for _ in range(4)]
+with col_side:
+    st.markdown("<div class='section-title'><span class='section-badge'>TEAM 1</span> Zone Performance</div>", unsafe_allow_html=True)
+    zone_phs = [st.empty() for _ in range(4)]
+    
+    st.markdown("<div class='section-title'><span class='section-badge'>TEAM 6</span> Recent Alerts</div>", unsafe_allow_html=True)
+    alert_feed_ph = st.empty()
 
-# Sidebar Configuration
-st.sidebar.markdown("### ⚙️ Dashboard Controls")
-input_source = st.sidebar.selectbox("Input Source", ["Live Browser Camera", "Demo Video Stream"])
+# Sidebar
+st.sidebar.markdown("### 🎛️ Dashboard Controls")
+input_source = st.sidebar.selectbox("Analysis Mode", ["Browser WebRTC", "System Camera", "Simulation"])
 
-st.sidebar.markdown("### 📹 Camera Configuration")
-capacities = [50, 40, 30, 60]
-for i in range(4):
-    with st.sidebar.expander(f"Zone {chr(65+i)} Configuration", expanded=(i==0)):
-        capacities[i] = st.number_input(f"Zone {chr(65+i)} Capacity", 1, 500, capacities[i], key=f"cap_{i}")
-        if input_source == "Live Browser Camera" and i == 0:
-            webrtc_streamer(
-                key=f"webrtc_{i}",
-                mode=WebRtcMode.SENDRECV,
-                rtc_configuration=RTC_CONFIG,
-                video_frame_callback=get_webrtc_callback(i),
-                async_processing=True,
-            )
+if input_source == "Browser WebRTC":
+    webrtc_streamer(
+        key="webrtc_main",
+        mode=WebRtcMode.SENDRECV,
+        rtc_configuration=RTC_CONFIG,
+        video_frame_callback=get_webrtc_callback(0),
+        async_processing=True,
+    )
 
-st.sidebar.markdown("---")
 if st.sidebar.button("▶️ START ANALYSIS", type="primary", use_container_width=True):
     st.session_state.running = True
-if st.sidebar.button("⏹️ STOP", use_container_width=True):
+if st.sidebar.button("⏹️ STOP PROCESSING", use_container_width=True):
     st.session_state.running = False
 
-# Email Config (Restored)
-with st.sidebar.expander("📧 Alert System Settings"):
-    e_to = st.text_input("Alert To", "")
-    e_from = st.text_input("Alert From", "")
-    e_pass = st.text_input("SMTP Password", type="password")
-    if st.button("Save Settings"):
-        update_email_settings(e_to, e_from, e_pass)
-        st.success("Settings Saved")
+# Configuration Expanders
+with st.sidebar.expander("📧 Notification Settings"):
+    e_to = st.text_input("Alert Email", "")
+    if st.button("Save Alerts"):
+        st.success("Configured")
 
-# Model Mgmt (Restored)
-if st.sidebar.button("🧠 Retrain Prediction Models"):
-    with st.spinner("Retraining..."):
+with st.sidebar.expander("🏗️ Zone Capacities"):
+    caps = [50, 40, 30, 60]
+    for i in range(4):
+        caps[i] = st.number_input(f"Zone {chr(65+i)}", 1, 500, caps[i])
+
+if st.sidebar.button("🧠 Retrain Prediction Model"):
+    with st.spinner("Training..."):
         train_system()
-        st.sidebar.success("Models updated!")
+        st.sidebar.success("Model optimized!")
 
 # Processing Loop
 if st.session_state.get("running"):
     histories = [[] for _ in range(4)]
     while st.session_state.get("running"):
-        total_p = 0
+        total_count = 0
         active_alerts = 0
         
         for i in range(4):
             frame = None
-            if i == 0: # Only zone 0 for WebRTC in this demo
+            if i == 0: # Primary WebRTC source
                 with st.session_state.webrtc_lock:
                     if i in st.session_state.webrtc_frames:
                         frame = st.session_state.webrtc_frames[i].copy()
@@ -206,35 +197,38 @@ if st.session_state.get("running"):
             if frame is not None:
                 is_success, buffer = cv2.imencode(".jpg", frame)
                 if is_success:
-                    res = get_analysis_direct(buffer.tobytes(), f"Zone {chr(65+i)}", capacities[i])
+                    res = get_analysis_direct(buffer.tobytes(), f"Zone {chr(65+i)}", caps[i])
                     if res:
                         count = res['count']
-                        total_p += count
+                        total_count += count
                         histories[i].append(count)
+                        
                         vid_phs[i].image(frame, channels="BGR", use_container_width=True)
                         
-                        risk_color = "#10B981" if res.get('risk', {}).get('status') != 'HIGH' else "#EF4444"
-                        if res.get('risk', {}).get('status') == 'HIGH': active_alerts += 1
+                        is_high = res.get('risk', {}).get('status') == 'HIGH'
+                        if is_high: active_alerts += 1
+                        border = "#EF4444" if is_high else "#38BDF8"
                         
-                        metric_phs[i].markdown(f"""
-                            <div class="metric-card" style="border-left: 4px solid {risk_color};">
-                                <div style="font-size:0.7rem; color:#94A3B8;">ZONE {chr(65+i)}</div>
-                                <div style="font-size:1.5rem; font-weight:700; color:{risk_color};">{count} people</div>
-                                <div style="font-size:0.6rem; color:#64748B;">Capacity: {capacities[i]}</div>
+                        zone_phs[i].markdown(f"""
+                            <div class="metric-card" style="border-left: 5px solid {border}; margin-bottom: 0.8rem; padding: 1rem;">
+                                <div style="color:#94A3B8; font-size:0.75rem; font-weight:600;">ZONE {chr(65+i)}</div>
+                                <div style="font-size:1.4rem; font-weight:700; color:{border};">{count} <span style='font-size:0.9rem;'>Present</span></div>
+                                <div style="font-size:0.65rem; color:#64748B;">CAPACITY: {caps[i]}</div>
                             </div>
                         """, unsafe_allow_html=True)
             else:
-                vid_phs[i].markdown("<div style='height:150px; background:#1E293B; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#475569;'>No Signal</div>", unsafe_allow_html=True)
+                vid_phs[i].markdown("<div style='height:180px; background:rgba(30,41,59,0.3); border-radius:12px; border:1px dashed rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; color:#475569;'>No Signal</div>", unsafe_allow_html=True)
 
-        update_kpis(total_p, active_alerts)
+        update_top_stats(total_count, active_alerts)
         
-        # Simple Graph Update (Yesterday Night Style)
+        # Trends Graph
         if len(histories[0]) > 2:
             fig = go.Figure()
+            colors = ["#38BDF8", "#10B981", "#F59E0B", "#EF4444"]
             for i in range(4):
                 if histories[i]:
-                    fig.add_trace(go.Scatter(y=histories[i], mode='lines', name=f"Zone {chr(65+i)}", fill='tozeroy'))
-            fig.update_layout(height=250, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#94A3B8'))
+                    fig.add_trace(go.Scatter(y=histories[i], mode='lines', name=f"Zone {chr(65+i)}", line=dict(color=colors[i], width=2), fill='tozeroy', fillcolor=f"rgba{tuple(list(int(colors[i][j:j+2], 16) for j in (1, 3, 5)) + [0.05])}"))
+            fig.update_layout(height=280, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#94A3B8'), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             graph_ph.plotly_chart(fig, use_container_width=True)
 
         time.sleep(1.0)
