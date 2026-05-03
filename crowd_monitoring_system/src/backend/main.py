@@ -35,12 +35,20 @@ class EmailSettings(BaseModel):
     email_password: str
 
 @app.post("/update-email-settings")
-def update_emails(settings: EmailSettings):
-    try:
-        # Settings update logic - stores credentials for alert system
-        return {"status": "success", "message": "Email settings updated"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+def update_email_settings(settings: EmailSettings):
+    import dotenv
+    import os
+    env_path = ".env"
+    if not os.path.exists(env_path):
+        open(env_path, 'w').close()
+    dotenv.set_key(env_path, "ALERT_EMAIL_TO", settings.email_to)
+    dotenv.set_key(env_path, "ALERT_EMAIL_FROM", settings.email_from)
+    dotenv.set_key(env_path, "ALERT_EMAIL_PASSWORD", settings.email_password)
+    
+    os.environ["ALERT_EMAIL_TO"] = settings.email_to
+    os.environ["ALERT_EMAIL_FROM"] = settings.email_from
+    os.environ["ALERT_EMAIL_PASSWORD"] = settings.email_password
+    return {"status": "success"}
 
 class PredictRequest(BaseModel):
     periods: int = 30

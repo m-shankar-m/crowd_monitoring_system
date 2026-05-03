@@ -11,7 +11,7 @@ class PersonDetector:
             self.model = YOLO(model_path)
             
     def detect(self, image):
-        # Optimized for Cloud CPU: using nano model and 640 imgsz for fast inference
+        # Reduced image size and switched to nano model to save RAM
         results = self.model(image, classes=[0], imgsz=640, conf=0.15, iou=0.45, verbose=False) 
         boxes = []
         if len(results) > 0:
