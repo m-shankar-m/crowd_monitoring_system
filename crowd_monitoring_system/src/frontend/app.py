@@ -60,7 +60,7 @@ def get_analysis_direct(image_bytes, zone_name, max_capacity):
         alert_info = generate_alert(results["count"], zone_name, max_capacity, forecast_info)
         results["risk"] = alert_info
         
-        # If High Alert, add to global feed
+        # If High Alert, add to global feed and handle email
         if alert_info.get("level") == "HIGH ALERT":
             if "alert_history" not in st.session_state:
                 st.session_state.alert_history = []
@@ -75,8 +75,26 @@ def get_analysis_direct(image_bytes, zone_name, max_capacity):
                     "ts": time.time(),
                     "count": results["count"]
                 })
-                # Keep only last 10
                 st.session_state.alert_history = st.session_state.alert_history[:10]
+                
+                # --- NEW: Trigger Frontend Email Dispatch ---
+                if st.session_state.get("email_configured"):
+                    try:
+                        import smtplib
+                        from email.message import EmailMessage
+                        
+                        msg = EmailMessage()
+                        msg.set_content(f"CRITICAL ALERT: {alert_info['message']}\nZone: {zone_name}\nCount: {results['count']}")
+                        msg["Subject"] = f"🚨 Crowd Alert: {zone_name}"
+                        msg["From"] = st.session_state.email_from
+                        msg["To"] = st.session_state.email_to
+                        
+                        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
+                            server.login(st.session_state.email_from, st.session_state.email_pass)
+                            server.send_message(msg)
+                            DEBUG_INFO["last_call"] += " (Email Sent)"
+                    except Exception as email_err:
+                        DEBUG_INFO["error"] = f"Email Error: {email_err}"
         
         return results
     except Exception as e:
@@ -185,9 +203,15 @@ if st.sidebar.button("⏹️ STOP PROCESSING", use_container_width=True):
 
 # Configuration Expanders
 with st.sidebar.expander("📧 Notification Settings"):
-    e_to = st.text_input("Alert Email", "")
-    if st.button("Save Alerts"):
-        st.success("Configured")
+    st.session_state.email_to = st.text_input("Alert Email To", st.session_state.get("email_to", ""))
+    st.session_state.email_from = st.text_input("Send From (Gmail)", st.session_state.get("email_from", ""))
+    st.session_state.email_pass = st.text_input("App Password", type="password")
+    if st.button("Save & Enable Alerts"):
+        if st.session_state.email_to and st.session_state.email_from and st.session_state.email_pass:
+            st.session_state.email_configured = True
+            st.success("Alert system active!")
+        else:
+            st.error("Fill all fields")
 
 with st.sidebar.expander("🏗️ Zone Capacities"):
     caps = [50, 40, 30, 60]
