@@ -344,6 +344,14 @@ with st.sidebar.expander("AI Backend Diagnostics", expanded=False):
                     st.success(f"✅ Connected: {test_resp.json().get('status')}")
                 else:
                     st.error(f"❌ Status {test_resp.status_code}: {test_resp.text[:100]}")
+                # 3. State Diagnostic
+                st.write(f"**Session State Details:**")
+                st.write(f"Running: {st.session_state.get('running')}")
+                st.write(f"Last Track Count: {st.session_state.get('last_count_0', 0)}")
+                if local_detector:
+                    st.success("🤖 Local AI Engine: Loaded")
+                else:
+                    st.warning("⚠️ Local AI Engine: Not Loaded (CPU/Library issue)")
             except Exception as e:
                 st.error(f"❌ Connection Failed")
                 st.exception(e) # Show full traceback for debugging
@@ -694,6 +702,9 @@ if st.session_state.get('running', False) and input_source != "None":
                         zone_counts[i] = 0
                         
                     st.session_state[f"last_count_{i}"] = zone_counts[i]
+                    
+                    # DEBUG: Draw a tiny green dot to prove drawing logic is active
+                    cv2.rectangle(frame_rgb, (5, 5), (10, 10), (0, 255, 0), -1)
                     
                     for t in tracks:
                         try:
