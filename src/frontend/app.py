@@ -421,7 +421,12 @@ if input_source == "Upload Video":
             caps[i] = cv2.VideoCapture(temp_path)
 elif input_source == "Live Camera":
     if 'camera_configs' not in st.session_state:
-        st.session_state.camera_configs = [{"type": "System Camera (Laptop)", "value": "0"}]
+        st.session_state.camera_configs = [
+            {"type": "System Camera (Laptop)", "value": "0"},
+            {"type": "System Camera (Laptop)", "value": "0"},
+            {"type": "System Camera (Laptop)", "value": "0"},
+            {"type": "System Camera (Laptop)", "value": "0"}
+        ]
 
     for i in range(len(st.session_state.camera_configs)):
         if i < 4:
@@ -537,7 +542,7 @@ if st.session_state.get('running', False) and input_source != "None":
                             
                     add_footer(frame_rgb, f"{zones[i]} - {zone_counts[i]} detected")
                     frames[i] = frame_rgb
-            elif st.session_state.camera_configs[i]["value"] == "WEBRTC":
+            elif i < len(st.session_state.camera_configs) and st.session_state.camera_configs[i]["value"] == "WEBRTC":
                 # WebRTC feeds are handled by the streamer component, but we need to track counts
                 active_caps += 1
                 if f"webrtc_ctx_{i}" in st.session_state and st.session_state[f"webrtc_ctx_{i}"].video_processor:
