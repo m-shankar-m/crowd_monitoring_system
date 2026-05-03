@@ -19,9 +19,13 @@ def upload_frame(file_bytes, zone_name=None, max_capacity=25):
 def train_model():
     try:
         resp = requests.post(f"{BASE_URL}/train", timeout=300)
-        return resp.json()
-    except:
-        return None
+        if resp.status_code == 200:
+            return resp.json()
+        return {"status": "error", "message": f"Server Error {resp.status_code}: {resp.text[:50]}"}
+    except requests.exceptions.Timeout:
+        return {"status": "error", "message": "Training timed out (took > 5 mins)"}
+    except Exception as e:
+        return {"status": "error", "message": f"Connection Failed: {str(e)[:50]}"}
 
 def get_forecast():
     try:

@@ -12,6 +12,8 @@ class ForecastModel:
     def train(self, df):
         if df.empty or len(df) < 3:
             return False
+        # Ensure ds and y are present and sorted
+        df = df.sort_values('ds').reset_index(drop=True)
         self.model = Prophet(yearly_seasonality=False, weekly_seasonality=False, daily_seasonality=True)
         # Add extra regressors for hour and day
         if 'hour' in df.columns:
@@ -23,8 +25,10 @@ class ForecastModel:
         
     def save(self, filepath="models/prophet_model.json"):
         import json
+        import os
         if self.model is None:
             return False
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, 'w') as f:
             json.dump(model_to_json(self.model), f)
         return True

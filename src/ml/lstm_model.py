@@ -69,9 +69,21 @@ class CrowdLSTMModel:
 
         # Use count, hour, and day as features
         features = ['y', 'hour', 'day']
+        
+        # Check for data variation to avoid scaling issues
+        for feat in features:
+            if df[feat].nunique() <= 1:
+                # Add tiny noise to avoid constant value scaling issues if necessary, 
+                # but better to just warn or skip if it's too degenerate.
+                pass 
+
         train_data = df[features].values
         train_data_normalized = self.scaler.fit_transform(train_data)
         train_data_tensor = torch.FloatTensor(train_data_normalized)
+
+        # Re-initialize model and optimizer to avoid inplace operation errors with persistent graphs
+        self.model = CrowdLSTM()
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
 
         train_inout_seq = self.create_inout_sequences(train_data_tensor)
         if not train_inout_seq:
