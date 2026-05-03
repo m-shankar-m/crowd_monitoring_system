@@ -6,8 +6,9 @@ fastapi
 uvicorn
 streamlit
 plotly
-streamlit-webrtc
+streamlit-webrtc>=0.47.1
 python-multipart
 requests
 python-dotenv
+tornado==6.3.3
 pytest
