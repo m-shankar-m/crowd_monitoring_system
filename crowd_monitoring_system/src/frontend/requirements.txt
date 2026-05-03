@@ -1,6 +1,14 @@
-streamlit
+streamlit-webrtc>=0.47.1
+tornado==6.3.3
+ultralytics
 opencv-python-headless
-numpy
-plotly
 pandas
+prophet
+fastapi
+uvicorn
+streamlit
+plotly
+python-multipart
 requests
+python-dotenv
+pytest
