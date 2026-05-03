@@ -1,6 +1,6 @@
 streamlit
 streamlit-webrtc
-opencv-contrib-python-headless
+opencv-python-headless
 ultralytics
 pandas
 prophet
