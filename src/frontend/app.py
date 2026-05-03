@@ -665,7 +665,7 @@ if st.session_state.get('running', False) and input_source != "None":
                                 bbox = t.get('bbox', [])
                                 if len(bbox) == 4:
                                     x1, y1, x2, y2 = bbox
-                                    cv2.rectangle(frame_rgb, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 4)
+                                    cv2.rectangle(frame_rgb, (int(x1), int(y1)), (int(x2), int(y2)), (255, 0, 0), 4)
                             except Exception:
                                 continue
                     elif res and "error" in res:
