@@ -552,7 +552,7 @@ if st.session_state.get('running', False) and input_source != "None":
                     
         # Update layout images
         for i in range(4):
-            if frames[i] == "WEBRTC_ACTIVE":
+            if isinstance(frames[i], str) and frames[i] == "WEBRTC_ACTIVE":
                 with ph_vids[i].container():
                     ctx = webrtc_streamer(
                         key=f"webrtc-{i}-{time.time() // 3600}", # Refresh key every hour
