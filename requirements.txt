@@ -1,6 +1,6 @@
 streamlit
-streamlit-webrtc==0.47.1
-opencv-python-headless
+streamlit-webrtc
+opencv-contrib-python-headless
 ultralytics
 pandas
 prophet
@@ -10,5 +10,3 @@ plotly
 python-multipart
 requests
 python-dotenv
-aiortc
-pyav
