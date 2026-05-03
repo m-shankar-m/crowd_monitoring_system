@@ -59,6 +59,25 @@ def get_analysis_direct(image_bytes, zone_name, max_capacity):
         forecast_info = get_predictive_risk(periods=15)
         alert_info = generate_alert(results["count"], zone_name, max_capacity, forecast_info)
         results["risk"] = alert_info
+        
+        # If High Alert, add to global feed
+        if alert_info.get("level") == "HIGH ALERT":
+            if "alert_history" not in st.session_state:
+                st.session_state.alert_history = []
+            
+            # Prevent duplicate rapid alerts for same zone
+            last_alert = st.session_state.alert_history[0] if st.session_state.alert_history else None
+            if not last_alert or last_alert["zone"] != zone_name or time.time() - last_alert["ts"] > 60:
+                st.session_state.alert_history.insert(0, {
+                    "zone": zone_name,
+                    "level": alert_info["level"],
+                    "msg": alert_info["message"],
+                    "ts": time.time(),
+                    "count": results["count"]
+                })
+                # Keep only last 10
+                st.session_state.alert_history = st.session_state.alert_history[:10]
+        
         return results
     except Exception as e:
         DEBUG_INFO["error"] = str(e)
@@ -205,9 +224,11 @@ if st.session_state.get("running"):
                         
                         vid_phs[i].image(frame, channels="BGR", use_container_width=True)
                         
-                        is_high = res.get('risk', {}).get('status') == 'HIGH'
+                        is_high = res.get('risk', {}).get('level') == 'HIGH ALERT'
+                        is_mod = res.get('risk', {}).get('level') == 'MODERATE'
                         if is_high: active_alerts += 1
-                        border = "#EF4444" if is_high else "#38BDF8"
+                        
+                        border = "#EF4444" if is_high else ("#F59E0B" if is_mod else "#38BDF8")
                         
                         zone_phs[i].markdown(f"""
                             <div class="metric-card" style="border-left: 5px solid {border}; margin-bottom: 0.8rem; padding: 1rem;">
@@ -230,5 +251,19 @@ if st.session_state.get("running"):
                     fig.add_trace(go.Scatter(y=histories[i], mode='lines', name=f"Zone {chr(65+i)}", line=dict(color=colors[i], width=2), fill='tozeroy', fillcolor=f"rgba{tuple(list(int(colors[i][j:j+2], 16) for j in (1, 3, 5)) + [0.05])}"))
             fig.update_layout(height=280, margin=dict(l=0,r=0,t=0,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color='#94A3B8'), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             graph_ph.plotly_chart(fig, use_container_width=True)
+
+        # Update Alert Feed
+        if "alert_history" in st.session_state and st.session_state.alert_history:
+            alert_html = ""
+            for a in st.session_state.alert_history:
+                color = "#EF4444" if a["level"] == "HIGH ALERT" else "#F59E0B"
+                alert_html += f"""
+                    <div style="background:rgba(15,23,42,0.6); border-left:3px solid {color}; padding:8px; border-radius:4px; margin-bottom:8px; font-size:0.75rem;">
+                        <div style="font-weight:700; color:{color};">{a['level']} - {a['zone']}</div>
+                        <div style="color:#E2E8F0;">{a['msg']}</div>
+                        <div style="font-size:0.6rem; color:#64748B;">{time.strftime('%H:%M:%S', time.localtime(a['ts']))}</div>
+                    </div>
+                """
+            alert_feed_ph.markdown(alert_html, unsafe_allow_html=True)
 
         time.sleep(1.0)
