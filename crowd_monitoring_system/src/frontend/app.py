@@ -11,6 +11,7 @@ import requests
 import plotly.graph_objects as go
 import pandas as pd
 from src.frontend.api import upload_frame, get_forecast, train_model, update_email_settings
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode, RTCConfiguration
 import av
 import requests
 from src.frontend.api import BASE_URL
