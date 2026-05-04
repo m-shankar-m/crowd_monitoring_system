@@ -1,12 +1,15 @@
 streamlit
 streamlit-webrtc
 opencv-python-headless
+ultralytics
 pandas
+prophet
 fastapi
 uvicorn
 plotly
 python-multipart
 requests
 python-dotenv
+torch
 numpy>=1.23.5,<2.0.0
 tornado
