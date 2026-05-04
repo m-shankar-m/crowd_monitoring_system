@@ -24,19 +24,56 @@ def health():
     return {"status": "healthy"}
 
 @app.post("/live-density")
-async def live_density(file: UploadFile = File(...), zone_name: str = "Unknown", max_capacity: int = 25):
+def live_density(file: UploadFile = File(...), zone_name: str = "Unknown", max_capacity: int = 25):
     try:
-        contents = await file.read()
-        results = process_image(contents)
+        import shutil
+        import tempfile
+        import os
+        import cv2
+        from fastapi.responses import StreamingResponse
+        import json
         
-        # New: Get predictive context if count is high or rising
-        forecast_info = None
-        if results["count"] > 0.5 * max_capacity:
-            forecast_info = get_predictive_risk(periods=15)
+        filename = file.filename.lower() if file.filename else ""
+        is_video = filename.endswith((".mp4", ".avi", ".mov", ".mkv")) or file.content_type.startswith("video")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4" if is_video else ".jpg") as tf:
+            shutil.copyfileobj(file.file, tf)
+            tf_path = tf.name
             
-        alert_info = generate_alert(results["count"], zone_name, max_capacity, forecast_info)
-        results["risk"] = alert_info
-        return results
+        from src.backend.services.density import cv_pipeline
+        
+        if is_video:
+            def video_generator():
+                try:
+                    for res in cv_pipeline.process_video_stream(tf_path):
+                        yield json.dumps(res) + "\n"
+                finally:
+                    if os.path.exists(tf_path):
+                        os.remove(tf_path)
+            return StreamingResponse(video_generator(), media_type="application/x-ndjson")
+        else:
+            try:
+                frame = cv2.imread(tf_path)
+                if frame is None:
+                    raise ValueError("Invalid image")
+                results = cv_pipeline.process_frame(frame)
+                
+                # Predict risk if needed
+                forecast_info = None
+                if results["count"] > 0.5 * max_capacity:
+                    forecast_info = get_predictive_risk(periods=15)
+                    
+                alert_info = generate_alert(results["count"], zone_name, max_capacity, forecast_info)
+                results["risk"] = alert_info
+                return results
+            finally:
+                if os.path.exists(tf_path):
+                    os.remove(tf_path)
+                # Cleanup single frame memory
+                import gc; gc.collect()
+                import torch; 
+                if torch.cuda.is_available(): torch.cuda.empty_cache()
+                
     except Exception as e:
         print(f"ERROR processing live-density: {str(e)}")
         return {

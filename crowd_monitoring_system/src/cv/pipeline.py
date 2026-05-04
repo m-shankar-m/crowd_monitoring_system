@@ -41,3 +41,20 @@ class CVPipeline:
             self.last_log_time = current_time
             
         return {"count": smoothed_count, "tracks": tracks}
+
+    def process_video_stream(self, video_path):
+        import cv2
+        import gc
+        import torch
+        cap = cv2.VideoCapture(video_path)
+        frame_idx = 0
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret: break
+            yield self.process_frame(frame)
+            frame_idx += 1
+            if frame_idx % 30 == 0:
+                gc.collect()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+        cap.release()

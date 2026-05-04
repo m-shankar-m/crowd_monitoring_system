@@ -34,4 +34,4 @@ RUN mkdir -p logs data/models data/temp_videos
 EXPOSE 7860
 
 # Start FastAPI backend
-CMD ["uvicorn", "src.backend.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD uvicorn src.backend.main:app --host 0.0.0.0 --port ${PORT:-7860}

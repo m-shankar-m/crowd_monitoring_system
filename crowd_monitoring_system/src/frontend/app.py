@@ -18,13 +18,14 @@ from src.frontend.api import BASE_URL
 from src.cv.detector import PersonDetector
 from src.cv.tracker import Tracker
 
-# Initialize Local AI for fallback
-try:
-    local_detector = PersonDetector()
-    local_tracker = Tracker()
-except Exception:
-    local_detector = None
-    local_tracker = None
+@st.cache_resource
+def load_local_ai():
+    try:
+        return PersonDetector(), Tracker()
+    except Exception:
+        return None, None
+
+local_detector, local_tracker = load_local_ai()
 
 # Pre-warm the backend (wake up Hugging Face space)
 try:
@@ -365,9 +366,10 @@ c1, c2 = st.columns([2.5, 1])
 # ------------- LEFT COLUMN -------------
 with c1:
     st.markdown("<div class='section-title'><span class='section-badge'>Team 2</span> Crowd count over time — prediction</div>", unsafe_allow_html=True)
-    graph_ph = st.empty()
+    g_cols = st.columns(2)
+    graph_phs = [g_cols[0].empty(), g_cols[1].empty(), g_cols[0].empty(), g_cols[1].empty()]
     
-    st.markdown("<div class='section-title'><span class='section-badge'>Team 2</span> Video detection — simulated frames</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'><span class='section-badge'>Team 2</span> Video detection — Real-Time Inference</div>", unsafe_allow_html=True)
     v1, v2 = st.columns(2)
     v3, v4 = st.columns(2)
     vid_a = v1.empty()
@@ -446,10 +448,10 @@ def update_alert_feed(counts, caps):
 
 def get_zone_forecast(history):
     if not history: return None
-    import requests
+    from src.frontend.api import session, BASE_URL
     try:
         # Fixed: Use BASE_URL instead of hardcoded localhost
-        r = requests.post(f"{BASE_URL}/predict-zone", json={"periods": 15, "history_counts": history[-100:]}, timeout=5)
+        r = session.post(f"{BASE_URL}/predict-zone", json={"periods": 15, "history_counts": history[-100:]}, timeout=5)
         return r.json()
     except Exception:
         return None
@@ -457,63 +459,59 @@ def get_zone_forecast(history):
 def render_graphs(histories):
     names = ["Zone A/1", "Zone B/2", "Zone C/3", "Zone D/4"]
     
-    with graph_ph.container():
-        cols = st.columns(2)
-        idx = 0
-        for i in range(4):
-            h = histories[i]
-            if not h or len(h) < 1:
-                continue
-                
-            forecast_res = get_zone_forecast(h)
-            if not forecast_res or "forecasts" not in forecast_res:
-                continue
-                
-            data = forecast_res["forecasts"]
-            df_forecast = pd.DataFrame(data)
+    for i in range(4):
+        h = histories[i]
+        if not h or len(h) < 1:
+            continue
             
-            df_actual = pd.DataFrame({'predicted_count': h})
-            df_actual['timestamp'] = [pd.to_datetime(time.time() - (len(h)-k)*0.75, unit='s') for k in range(len(h))]
+        forecast_res = get_zone_forecast(h)
+        if not forecast_res or "forecasts" not in forecast_res or len(forecast_res["forecasts"]) == 0:
+            continue
             
-            last_time = pd.to_datetime(time.time(), unit='s')
-            p_val = df_forecast['predicted_count']
-            p_time = [last_time + pd.Timedelta(seconds=3 * (j + 1)) for j in range(len(p_val))]
-            
-            fig = go.Figure()
-            
-            fig.add_trace(go.Scatter(
-                x=df_actual['timestamp'], 
-                y=df_actual['predicted_count'],
-                mode='lines',
-                line=dict(color='#38BDF8', width=2),
-                name='History',
-                fill='tozeroy',
-                fillcolor='rgba(56, 189, 248, 0.1)'
-            ))
-            
-            fig.add_trace(go.Scatter(
-                x=p_time, 
-                y=p_val,
-                mode='lines',
-                line=dict(color='#EF4444', width=2, dash='dot'),
-                name='Prediction',
-                fill='tozeroy',
-                fillcolor='rgba(239, 68, 68, 0.05)'
-            ))
-            
-            fig.update_layout(
-                title=dict(text=f"{names[i]} Forecast", font=dict(color='#E2E8F0', size=13)),
-                margin=dict(l=0, r=0, t=30, b=0),
-                height=180,
-                showlegend=False,
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                yaxis=dict(showgrid=True, gridcolor='#1E293B', zeroline=False)
-            )
-            
-            cols[idx % 2].plotly_chart(fig, use_container_width=True, key=f"pg_{i}_{time.time()}")
-            idx += 1
+        data = forecast_res["forecasts"]
+        df_forecast = pd.DataFrame(data)
+        
+        df_actual = pd.DataFrame({'predicted_count': h})
+        df_actual['timestamp'] = [pd.to_datetime(time.time() - (len(h)-k)*0.75, unit='s') for k in range(len(h))]
+        
+        last_time = pd.to_datetime(time.time(), unit='s')
+        p_val = df_forecast['predicted_count']
+        p_time = [last_time + pd.Timedelta(seconds=3 * (j + 1)) for j in range(len(p_val))]
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=df_actual['timestamp'], 
+            y=df_actual['predicted_count'],
+            mode='lines',
+            line=dict(color='#38BDF8', width=2),
+            name='History',
+            fill='tozeroy',
+            fillcolor='rgba(56, 189, 248, 0.1)'
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=p_time, 
+            y=p_val,
+            mode='lines',
+            line=dict(color='#EF4444', width=2, dash='dot'),
+            name='Prediction',
+            fill='tozeroy',
+            fillcolor='rgba(239, 68, 68, 0.05)'
+        ))
+        
+        fig.update_layout(
+            title=dict(text=f"{names[i]} Forecast", font=dict(color='#E2E8F0', size=13)),
+            margin=dict(l=0, r=0, t=30, b=0),
+            height=180,
+            showlegend=False,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=True, gridcolor='#1E293B', zeroline=False)
+        )
+        
+        graph_phs[i].plotly_chart(fig, use_container_width=True, key=f"pg_zone_{i}")
 
 
 # Sidebar Settings
@@ -670,6 +668,7 @@ if st.session_state.get('running', False) and input_source != "None":
                 if not ret:
                     caps[i].release()
                     caps[i] = None
+                    continue
                 # Downscale individual feeds to maintain overall UI performance
                 frame = cv2.resize(frame, (480, 270))
                 is_success, buffer = cv2.imencode(".jpg", frame)
@@ -739,6 +738,11 @@ if st.session_state.get('running', False) and input_source != "None":
                 
         if active_caps == 0:
             st.warning("No active video feeds detected or all feeds have finished playing.")
+            if len(st.session_state.histories[0]) > 1:
+                try:
+                    render_graphs(st.session_state.histories)
+                except Exception:
+                    pass
             st.session_state.running = False
             time.sleep(1)
             break
@@ -754,19 +758,10 @@ if st.session_state.get('running', False) and input_source != "None":
             if len(st.session_state.histories[i]) > 300:
                 st.session_state.histories[i].pop(0)
                 
-        # Update graph
-        import pandas as pd
-        # Only update if we have at least 2 points to draw
-        if len(st.session_state.histories[0]) > 1:
+        # Update graph (throttle to every 30 frames to prevent API overload & UI freezing)
+        if len(st.session_state.histories[0]) > 1 and (frame_counter % 30 == 0 or frame_counter == 2):
             try:
-                graph_data = pd.DataFrame({
-                    'Time': range(len(st.session_state.histories[0])),
-                    'Zone A': st.session_state.histories[0],
-                    'Zone B': st.session_state.histories[1],
-                    'Zone C': st.session_state.histories[2],
-                    'Zone D': st.session_state.histories[3],
-                })
-                graph_ph.line_chart(graph_data.set_index('Time'), use_container_width=True)
+                render_graphs(st.session_state.histories)
             except Exception:
                 pass
             

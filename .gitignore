@@ -18,9 +18,13 @@ ENV/
 
 # Large weight files
 *.pt
-*.pth
 *.weights
 *.h5
+
+# Allow custom trained models to be pushed to HF
+!models/*.pth
+!models/*.pkl
+!models/*.json
 
 # Application logs
 logs/
@@ -34,6 +38,7 @@ node_modules/
 
 # Data
 data/
+!data/crowd_data.csv
 sample_video.mp4
 
 # Testing and Coverage

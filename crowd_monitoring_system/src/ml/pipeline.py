@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 import threading
 from .prophet_model import ForecastModel
@@ -78,6 +79,9 @@ class MLPipeline:
                     })
                 else:
                     df = pd.read_csv(self.csv_path)
+                    
+                if len(df) < 2:
+                    return []
                 
                 df['ds'] = pd.to_datetime(df['timestamp'])
                 df['y'] = df['count'].rolling(window=min(3, len(df)), min_periods=1).mean()
@@ -89,23 +93,47 @@ class MLPipeline:
                 prophet_df = self.prophet_model.predict(periods=periods)
                 lstm_preds = self.lstm_model.predict(df, periods=periods)
                 
-                if prophet_df is None:
-                    return []
-                    
                 results = []
-                for i, row in prophet_df.iterrows():
-                    p_val = max(0, int(row['yhat']))
+                last_val = history_counts[-1] if history_counts is not None and len(history_counts) > 0 else 0
+                
+                # Calculate real-time trend if we have enough data
+                trend = 0
+                if history_counts is not None and len(history_counts) > 2:
+                    recent_diffs = np.diff(history_counts[-5:]) if len(history_counts) >= 5 else np.diff(history_counts)
+                    trend = np.mean(recent_diffs)
+                    # Dampen the trend to prevent crazy extrapolation
+                    trend = np.clip(trend, -2.0, 2.0)
+                
+                # Prophet dataframe might have non-zero starting index, so we reset it
+                if prophet_df is not None:
+                    prophet_df = prophet_df.reset_index(drop=True)
                     
-                    # Check for ensemble
-                    if lstm_preds is not None and i < len(lstm_preds):
-                        l_val = max(0, int(lstm_preds[i]))
-                        ensem_val = int((p_val + l_val) / 2)
-                    else:
-                        ensem_val = p_val
+                for idx in range(periods):
+                    # 1. Base Naive Extrapolation
+                    naive_pred = max(0, last_val + (trend * (idx + 1)))
+                    
+                    # 2. Get AI Prediction
+                    ai_pred = None
+                    if lstm_preds is not None and idx < len(lstm_preds):
+                        ai_pred = max(0, lstm_preds[idx])
+                    elif prophet_df is not None and idx < len(prophet_df):
+                        ai_pred = max(0, prophet_df.iloc[idx]['yhat'])
                         
+                    # 3. Smart Blending
+                    if ai_pred is not None and ai_pred > 0:
+                        # Smoothly transition from live naive trend to AI baseline
+                        # idx=0 means 90% naive, idx=14 means 60% AI
+                        alpha = min(0.6, (idx + 1) / periods)
+                        pred_val = int(naive_pred * (1 - alpha) + ai_pred * alpha)
+                    else:
+                        pred_val = int(naive_pred)
+                        
+                    # Calculate future timestamp based on last input time + 3s steps
+                    future_ts = df['ds'].iloc[-1] + pd.Timedelta(seconds=3 * (idx + 1))
+                    
                     results.append({
-                        "timestamp": row['ds'].strftime("%Y-%m-%d %H:%M:%S"),
-                        "predicted_count": ensem_val
+                        "timestamp": future_ts.strftime("%Y-%m-%d %H:%M:%S"),
+                        "predicted_count": pred_val
                     })
                 return results
             except Exception:
