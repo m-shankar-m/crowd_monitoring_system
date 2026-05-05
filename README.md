@@ -4,6 +4,7 @@
 A robust, real-time computer vision and machine learning platform designed to monitor crowd density from live video feeds, identify immediate safety thresholds, and forecast future density trends to preemptively highlight high-risk situations.
 
 **GitHub Repository:** [https://github.com/m-shankar-m/crowd_monitoring_system.git](https://github.com/m-shankar-m/crowd_monitoring_system.git)
+
 ** deoplyed link:** [https://crowdmonitoringsystem-ct8dzn6xpbqsyvrjm4zm6v.streamlit.app/](https://crowdmonitoringsystem-ct8dzn6xpbqsyvrjm4zm6v.streamlit.app/)
 
 ## 🚀 Key Features
